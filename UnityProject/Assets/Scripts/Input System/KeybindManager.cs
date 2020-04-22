@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Newtonsoft.Json;
+using System.Linq;
 
 /// <summary>
 /// Describes all possible actions which can be mapped to a key
@@ -23,6 +24,7 @@ public enum KeyAction
 	MoveLeft,
 	MoveDown,
 	MoveRight,
+	ToggleWalkRun,
 
 	// Actions
 	ActionThrow,
@@ -47,6 +49,7 @@ public enum KeyAction
 	ChatLocal,
 	ChatRadio,
 	ChatOOC,
+	ToggleAHelp,
 
 	// Body Part Targeting
 	TargetHead,
@@ -263,6 +266,7 @@ public class KeybindManager : MonoBehaviour {
 		{ KeyAction.MoveLeft, 	new KeybindMetadata("Move Left", ActionType.Movement)},
 		{ KeyAction.MoveDown, 	new KeybindMetadata("Move Down", ActionType.Movement)},
 		{ KeyAction.MoveRight, 	new KeybindMetadata("Move Right", ActionType.Movement)},
+		{ KeyAction.ToggleWalkRun, new KeybindMetadata("Toggle Walk/Run", ActionType.Movement)},
 
 		// Actions
 		{ KeyAction.ActionThrow,	new KeybindMetadata("Throw", ActionType.Action)},
@@ -283,9 +287,10 @@ public class KeybindManager : MonoBehaviour {
 		{ KeyAction.IntentHarm, 	new KeybindMetadata("Harm Intent", ActionType.Intent)},
 
 		// Chat
-		{ KeyAction.ChatLocal, new KeybindMetadata("Chat", ActionType.Chat)},
-		{ KeyAction.ChatRadio, new KeybindMetadata("Radio Chat", ActionType.Chat)},
-		{ KeyAction.ChatOOC,   new KeybindMetadata("OOC Chat", ActionType.Chat)},
+		{ KeyAction.ChatLocal,   new KeybindMetadata("Chat", ActionType.Chat)},
+		{ KeyAction.ChatRadio,   new KeybindMetadata("Radio Chat", ActionType.Chat)},
+		{ KeyAction.ChatOOC,     new KeybindMetadata("OOC Chat", ActionType.Chat)},
+		{ KeyAction.ToggleAHelp, new KeybindMetadata("Toggle AHelp", ActionType.Chat)},
 
 		// Body part selection
 		{ KeyAction.TargetHead, 	new KeybindMetadata("Target Head, Eyes and Mouth", ActionType.Targeting)},
@@ -304,6 +309,7 @@ public class KeybindManager : MonoBehaviour {
 		{ KeyAction.MoveLeft, 		new DualKeyCombo(new KeyCombo(KeyCode.A), new KeyCombo(KeyCode.LeftArrow))},
 		{ KeyAction.MoveDown, 		new DualKeyCombo(new KeyCombo(KeyCode.S), new KeyCombo(KeyCode.DownArrow))},
 		{ KeyAction.MoveRight, 		new DualKeyCombo(new KeyCombo(KeyCode.D), new KeyCombo(KeyCode.RightArrow))},
+		{ KeyAction.ToggleWalkRun,   new DualKeyCombo(new KeyCombo(KeyCode.C), null)},
 
 		// Actions
 		{ KeyAction.ActionThrow,	new DualKeyCombo(new KeyCombo(KeyCode.R),	new KeyCombo(KeyCode.End))},
@@ -327,6 +333,7 @@ public class KeybindManager : MonoBehaviour {
 		{ KeyAction.ChatLocal, 		new DualKeyCombo(new KeyCombo(KeyCode.T), new KeyCombo(KeyCode.Return))},
 		{ KeyAction.ChatRadio,		new DualKeyCombo(new KeyCombo(KeyCode.Y), null)},
 		{ KeyAction.ChatOOC,   		new DualKeyCombo(new KeyCombo(KeyCode.U), null)},
+		{ KeyAction.ToggleAHelp,    new DualKeyCombo(new KeyCombo(KeyCode.F1), null)},
 
 		// Body part selection
 		{ KeyAction.TargetHead, 	new DualKeyCombo(new KeyCombo(KeyCode.Keypad8), null)},
@@ -515,6 +522,13 @@ public class KeybindManager : MonoBehaviour {
 				ResetKeybinds();
 				ModalPanelManager.Instance.Inform("Unable to read saved keybinds.\nThey were either corrupt or outdated, so they have been reset.");
 			}
+
+			// Properly updating user keybinds when we add or remove one
+			var newHotkeys        = defaultKeybinds.Keys.Except(userKeybinds.Keys);
+			var deprecatedHotKeys = userKeybinds.Keys.Except(defaultKeybinds.Keys);
+
+			foreach (KeyAction entry in newHotkeys) userKeybinds.Add(entry, defaultKeybinds[entry]);
+			foreach (KeyAction entry in deprecatedHotKeys) userKeybinds.Remove(entry);
 		}
 		else
 		{

@@ -5,23 +5,19 @@ using UnityEngine;
 
 public class AdminBwoinkMessage : ServerMessage
 {
-	public static short MessageType = (short) MessageTypes.AdminBwoinkMessage;
 	public string AdminUID;
 	public string Message;
-	public uint Recipient;
 
-	public override IEnumerator Process()
+	public override void Process()
 	{
-		yield return WaitFor(Recipient);
 		SoundManager.Play("Bwoink");
-		Chat.AddAdminPrivMsg(Message, AdminUID);
+		Chat.AddAdminPrivMsg(Message);
 	}
 
 	public static AdminBwoinkMessage  Send(GameObject recipient, string adminUid, string message)
 	{
 		AdminBwoinkMessage  msg = new AdminBwoinkMessage
 		{
-			Recipient = recipient.GetComponent<NetworkIdentity>().netId,
 			AdminUID = adminUid,
 			Message = message
 		};

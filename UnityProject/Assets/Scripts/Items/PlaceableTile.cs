@@ -9,11 +9,24 @@ using UnityEngine.Tilemaps;
 /// </summary>
 public class PlaceableTile : MonoBehaviour, ICheckedInteractable<PositionalHandApply>
 {
+	[NonSerialized]
+	public LayerTypeSelection layerTypeSelection = LayerTypeSelection.Underfloor | LayerTypeSelection.Effects;
 
 	[FormerlySerializedAs("entries")]
 	[Tooltip("Defines each possible way this item can be placed as a tile.")]
 	[SerializeField]
-	private List<PlaceableTileEntry> waysToPlace;
+	private List<PlaceableTileEntry> waysToPlace = null;
+
+	[Tooltip("How many seconds it takes to place.")]
+	[SerializeField]
+	private float placeTime = 1.0f;
+
+	[SerializeField]
+	private string placeSound = null;
+
+	[SerializeField]
+	private static readonly StandardProgressActionConfig ProgressConfig
+	= new StandardProgressActionConfig(StandardProgressActionType.Construction);
 
 	public bool WillInteract(PositionalHandApply interaction, NetworkSide side)
 	{
@@ -26,7 +39,7 @@ public class PlaceableTile : MonoBehaviour, ICheckedInteractable<PositionalHandA
 
 		//check if we are clicking a spot we can place a tile on
 		var interactableTiles = InteractableTiles.GetAt(interaction.WorldPositionTarget, side);
-		var tileAtPosition = interactableTiles.LayerTileAt(interaction.WorldPositionTarget);
+		var tileAtPosition = interactableTiles.LayerTileAt(interaction.WorldPositionTarget,layerTypeSelection);
 
 		foreach (var entry in waysToPlace)
 		{
@@ -42,8 +55,13 @@ public class PlaceableTile : MonoBehaviour, ICheckedInteractable<PositionalHandA
 				return true;
 			}
 		}
-
 		return false;
+	}
+	public void ClientPredictInteraction(PositionalHandApply interaction)
+	{
+		//start clientside melee cooldown so we don't try to spam melee
+		//requests to server
+		Cooldowns.TryStartClient(interaction, CommonCooldowns.Instance.Melee);
 	}
 
 	public void ServerPerformInteraction(PositionalHandApply interaction)
@@ -51,7 +69,7 @@ public class PlaceableTile : MonoBehaviour, ICheckedInteractable<PositionalHandA
 		//which matrix are we clicking on
 		var interactableTiles = InteractableTiles.GetAt(interaction.WorldPositionTarget, true);
 		Vector3Int cellPos = interactableTiles.WorldToCell(interaction.WorldPositionTarget);
-		var tileAtPosition = interactableTiles.LayerTileAt(interaction.WorldPositionTarget);
+		var tileAtPosition = interactableTiles.LayerTileAt(interaction.WorldPositionTarget,layerTypeSelection);
 
 		PlaceableTileEntry placeableTileEntry = null;
 
@@ -61,7 +79,6 @@ public class PlaceableTile : MonoBehaviour, ICheckedInteractable<PositionalHandA
 		{
 			itemAmount = stackable.Amount;
 		}
-
 		// find the first valid way possible to place a tile
 		foreach (var entry in waysToPlace)
 		{
@@ -86,9 +103,20 @@ public class PlaceableTile : MonoBehaviour, ICheckedInteractable<PositionalHandA
 
 		if (placeableTileEntry != null)
 		{
-			interactableTiles.TileChangeManager.UpdateTile(cellPos, placeableTileEntry.layerTile);
-			interactableTiles.TileChangeManager.SubsystemManager.UpdateAt(cellPos);
-			Inventory.ServerConsume(interaction.HandSlot, placeableTileEntry.itemCost);
+			GameObject performer = interaction.Performer;
+			Vector2 targetPosition = interaction.WorldPositionTarget;
+
+
+			void ProgressFinishAction()
+			{
+				interactableTiles.TileChangeManager.UpdateTile(cellPos, placeableTileEntry.layerTile);
+				interactableTiles.TileChangeManager.SubsystemManager.UpdateAt(cellPos);
+				Inventory.ServerConsume(interaction.HandSlot, placeableTileEntry.itemCost);
+				SoundManager.PlayNetworkedAtPos(placeSound, targetPosition);
+			}
+
+			var bar = StandardProgressAction.Create(ProgressConfig, ProgressFinishAction)
+				.ServerStartProgress(targetPosition, placeTime, performer);
 		}
 	}
 
@@ -99,7 +127,7 @@ public class PlaceableTile : MonoBehaviour, ICheckedInteractable<PositionalHandA
 	private class PlaceableTileEntry
 	{
 		[Tooltip("Layer tile which this will create when placed.")]
-		public LayerTile layerTile;
+		public LayerTile layerTile = null;
 
 		[Tooltip("What layer this can be placed on top of. Choose None to allow placing on empty space.")]
 		[SerializeField]
@@ -107,7 +135,7 @@ public class PlaceableTile : MonoBehaviour, ICheckedInteractable<PositionalHandA
 
 		[Tooltip("Particular tile this is placeable on. Leave empty to allow placing on any tile.")]
 		[SerializeField]
-		public LayerTile placeableOnlyOnTile;
+		public LayerTile placeableOnlyOnTile = null;
 
 		[Tooltip("The amount of this item required to place tile.")]
 		[SerializeField]

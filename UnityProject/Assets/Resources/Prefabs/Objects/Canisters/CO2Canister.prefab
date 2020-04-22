@@ -16,6 +16,11 @@ PrefabInstance:
       propertyPath: Resistances.FireProof
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 114615155852173970, guid: e9620f26b24f33c4cbe56a85ae95865d,
+        type: 3}
+      propertyPath: HeatResistance
+      value: 1000
+      objectReference: {fileID: 0}
     - target: {fileID: 114835659847540804, guid: e9620f26b24f33c4cbe56a85ae95865d,
         type: 3}
       propertyPath: m_AssetId
@@ -24,7 +29,7 @@ PrefabInstance:
     - target: {fileID: 114104253718565984, guid: e9620f26b24f33c4cbe56a85ae95865d,
         type: 3}
       propertyPath: Gases.Array.data[3]
-      value: 60933
+      value: 60932.95
       objectReference: {fileID: 0}
     - target: {fileID: 114271548548165924, guid: e9620f26b24f33c4cbe56a85ae95865d,
         type: 3}

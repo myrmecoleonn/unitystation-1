@@ -25,19 +25,6 @@ public class PlayerHealthUI : MonoBehaviour
 		DisableAll();
 	}
 
-	private void OnEnable()
-	{
-		UpdateManager.Instance.Add(UpdateMe);
-	}
-
-	private void OnDisable()
-	{
-		if (UpdateManager.Instance != null)
-		{
-			UpdateManager.Instance.Remove(UpdateMe);
-		}
-	}
-
 	private void DisableAll()
 	{
 		Transform[] childrenList = GetComponentsInChildren<Transform>(true);
@@ -74,12 +61,18 @@ public class PlayerHealthUI : MonoBehaviour
 		}
 	}
 
-	void UpdateMe()
+	void Update()
 	{
 		if (PlayerManager.LocalPlayer == null)
 		{
 			return;
 		}
+
+		if (humanUI && !oxygenButton.gameObject.activeInHierarchy)
+		{
+			EnableAlwaysVisible();
+		}
+
 		if (PlayerManager.LocalPlayerScript.IsGhost)
 		{
 			if(humanUI)
@@ -88,6 +81,8 @@ public class PlayerHealthUI : MonoBehaviour
 			}
 			return;
 		}
+
+
 		if(!PlayerManager.LocalPlayerScript.IsGhost && !humanUI)
 		{
 			EnableAlwaysVisible();
@@ -96,7 +91,7 @@ public class PlayerHealthUI : MonoBehaviour
 		float temperature = PlayerManager.LocalPlayerScript.playerHealth.respiratorySystem.temperature;
 		float pressure = PlayerManager.LocalPlayerScript.playerHealth.respiratorySystem.pressure;
 
-		if(temperature < 110)
+		if (temperature < 110)
 		{
 			SetSpecificVisibility(true, coldAlert);
 		}
@@ -138,7 +133,7 @@ public class PlayerHealthUI : MonoBehaviour
 		SetSpecificVisibility(PlayerManager.LocalPlayerScript.playerHealth.respiratorySystem.IsSuffocating, oxygenAlert);
 
 		SetSpecificVisibility(false, toxinAlert);
-		SetSpecificVisibility(false, hungerAlert);
+		SetSpecificVisibility(PlayerManager.LocalPlayerScript.playerHealth.Metabolism.IsHungry, hungerAlert);
 
 		if (PlayerManager.Equipment.HasInternalsEquipped() && !oxygenButton.IsInteractable())
 		{

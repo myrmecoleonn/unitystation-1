@@ -17,9 +17,10 @@ MonoBehaviour:
   TileType: 3
   RequiredTiles:
   - {fileID: 11400000, guid: 83855008e43a2674d8d6a006ce94326f, type: 2}
-  WalkingSoundCategory: 2
+  floorTileType: 2
   atmosPassable: 1
   isSealed: 1
+  SpawnWithNoAir: 0
   oreCategory: 0
   MaxHealth: 0
   HealthStates: []
@@ -49,8 +50,10 @@ MonoBehaviour:
     Acid: 0
     Magic: 0
     Bio: 0
-  tileInteractions: []
-  spawnOnDeconstruct: {fileID: 0}
+  tileInteractions:
+  - {fileID: 11400000, guid: 7b6820d9f95c544a8bf274f9125b4941, type: 2}
+  spawnOnDeconstruct: {fileID: 7602444472548548205, guid: bae9e1730d4424fbfa160f045597a604,
+    type: 3}
   spawnAmountOnDeconstruct: 1
   connectCategory: 3
   connectType: 2

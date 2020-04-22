@@ -8,18 +8,7 @@ using UnityEngine.SceneManagement;
 
 public class CargoManager : MonoBehaviour
 {
-	private static CargoManager _cargoManager;
-	public static CargoManager Instance
-	{
-		get
-		{
-			if (_cargoManager == null)
-			{
-				_cargoManager = FindObjectOfType<CargoManager>();
-			}
-			return _cargoManager;
-		}
-	}
+	public static CargoManager Instance;
 
 	public int Credits;
 	public ShuttleStatus ShuttleStatus = ShuttleStatus.DockedStation;
@@ -37,12 +26,24 @@ public class CargoManager : MonoBehaviour
 	public CargoUpdateEvent OnTimerUpdate = new CargoUpdateEvent();
 
 	[SerializeField]
-	private CargoData cargoData;
+	private CargoData cargoData = null;
 
 	[SerializeField]
 	private float shuttleFlyDuration = 10f;
 
 	private HashMap<string, ExportedItem> exportedItems = new HashMap<string, ExportedItem>();
+
+	private void Awake()
+	{
+		if (Instance == null)
+		{
+			Instance = this;
+		}
+		else
+		{
+			Destroy(this);
+		}
+	}
 
 	private void OnEnable()
 	{
@@ -76,7 +77,8 @@ public class CargoManager : MonoBehaviour
 			return;
 		}
 
-		if (CurrentFlyTime > 0f)
+		if (CurrentFlyTime > 0f || ShuttleStatus == ShuttleStatus.OnRouteCentcom
+		                        || ShuttleStatus == ShuttleStatus.OnRouteStation)
 		{
 			return;
 		}
@@ -124,6 +126,7 @@ public class CargoManager : MonoBehaviour
 			yield return WaitFor.Seconds(1);
 		}
 
+		CurrentFlyTime = 0f;
 		if (launchToStation)
 		{
 			CargoShuttle.Instance.MoveToStation();

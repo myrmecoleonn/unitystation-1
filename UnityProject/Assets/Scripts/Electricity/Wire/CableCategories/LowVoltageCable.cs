@@ -5,14 +5,16 @@ using Mirror;
 
 public class LowVoltageCable : CableInheritance
 {
-	public HashSet<PowerTypeCategory> CanConnectTo = new HashSet<PowerTypeCategory>(){
+	public new HashSet<PowerTypeCategory> CanConnectTo = new HashSet<PowerTypeCategory>(){
 		PowerTypeCategory.LowMachineConnector,
 		PowerTypeCategory.LowVoltageCable,
 		PowerTypeCategory.SolarPanelController,
 		PowerTypeCategory.SolarPanel,
 		PowerTypeCategory.PowerSink,
 	};
-	public override void _OnStartServer()
+
+
+	void Awake()
 	{
 		ApplianceType = PowerTypeCategory.LowVoltageCable;
 		CableType = WiringColor.low;

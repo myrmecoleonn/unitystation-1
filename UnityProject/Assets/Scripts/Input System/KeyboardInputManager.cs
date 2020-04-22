@@ -33,7 +33,7 @@ public class KeyboardInputManager : MonoBehaviour
 
 	void CheckKeyboardInput()
 	{
-		if (!UIManager.IsInputFocus && GameData.IsInGame && CustomNetworkManager.Instance.IsClientConnected())
+		if (!UIManager.IsInputFocus)
 		{
 			// Perform escape key action
 			if (CommonInput.GetKeyDown(KeyCode.Escape))
@@ -41,15 +41,27 @@ public class KeyboardInputManager : MonoBehaviour
 				EscapeKeyTarget.HandleEscapeKey();
 			}
 
-			// Perform the checks for all key actions which have functions defined here
-			foreach (KeyValuePair<KeyAction, DualKeyCombo> entry in keybindManager.userKeybinds)
+			// Only check for keyboard input once in-game
+			if (GameData.IsInGame && Mirror.NetworkClient.active)
 			{
-				if (!keyActionFunctions.ContainsKey(entry.Key)) continue;
-				if (CheckComboEvent(entry.Value.PrimaryCombo) || CheckComboEvent(entry.Value.SecondaryCombo))
-				{
-					// Call the function associated with the KeyAction enum
-					keyActionFunctions[entry.Key]();
-				}
+				CheckInGameKeybinds();
+			}
+		}
+	}
+
+	/// <summary>
+	/// Checks all keybinds which are only used in-game
+	/// </summary>
+	void CheckInGameKeybinds()
+	{
+		// Perform the checks for all key actions which have functions defined here
+		foreach (KeyValuePair<KeyAction, DualKeyCombo> entry in keybindManager.userKeybinds)
+		{
+			if (!keyActionFunctions.ContainsKey(entry.Key)) continue;
+			if (CheckComboEvent(entry.Value.PrimaryCombo) || CheckComboEvent(entry.Value.SecondaryCombo))
+			{
+				// Call the function associated with the KeyAction enum
+				keyActionFunctions[entry.Key]();
 			}
 		}
 	}
@@ -113,6 +125,14 @@ public class KeyboardInputManager : MonoBehaviour
 	}
 
 	/// <summary>
+	/// Checks if the left or right shift key has been pressed
+	/// </summary>
+	public static bool IsShiftPressed()
+	{
+		return CommonInput.GetKey(KeyCode.LeftShift) || CommonInput.GetKey(KeyCode.RightShift);
+	}
+
+	/// <summary>
 	/// Checks if the left or right alt key has been pressed (AltGr sends RightAlt)
 	/// </summary>
 	public static bool IsAltPressed()
@@ -151,6 +171,7 @@ public class KeyboardInputManager : MonoBehaviour
 		{ KeyAction.ActionDrop,		() => {	UIManager.Action.Drop(); }},
 		{ KeyAction.ActionResist,	() => { UIManager.Action.Resist(); }},
 		{ KeyAction.ActionStopPull, () => { UIManager.Action.StopPulling(); }},
+		{ KeyAction.ToggleWalkRun,   () => { UIManager.WalkRun.RunWalk(); }},
 
 		{  KeyAction.HandSwap, 		() => { UIManager.Hands.Swap(); }},
 		{  KeyAction.HandActivate,	() => { UIManager.Hands.Activate(); }},
@@ -168,6 +189,7 @@ public class KeyboardInputManager : MonoBehaviour
 		{ KeyAction.ChatLocal,		() => { ChatUI.Instance.OpenChatWindow(ChatChannel.Local); }},
 		{ KeyAction.ChatRadio,		() => { ChatUI.Instance.OpenChatWindow(ChatChannel.Common); }},
 		{ KeyAction.ChatOOC,		() => { ChatUI.Instance.OpenChatWindow(ChatChannel.OOC); }},
+		{ KeyAction.ToggleAHelp,    () => { ChatUI.Instance.OnAdminHelpButton(); }},
 
 		// Body part selection
 		{ KeyAction.TargetHead,		() => { UIManager.ZoneSelector.CycleHead(); }},

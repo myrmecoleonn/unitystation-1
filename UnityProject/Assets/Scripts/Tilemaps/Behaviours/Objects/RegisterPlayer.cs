@@ -12,7 +12,7 @@ public class RegisterPlayer : RegisterTile, IServerSpawn
 {
 
 	// tracks whether player is down or upright.
-	[SyncVar(hook=nameof(SyncIsLayingDown))]
+	[SyncVar(hook = nameof(SyncIsLayingDown))]
 	private bool isLayingDown;
 
 	/// <summary>
@@ -32,6 +32,7 @@ public class RegisterPlayer : RegisterTile, IServerSpawn
 	public SlipEvent OnSlipChangeServer = new SlipEvent();
 
 	private PlayerScript playerScript;
+	public PlayerScript PlayerScript => playerScript;
 	private Directional playerDirectional;
 	private UprightSprites uprightSprites;
 
@@ -137,7 +138,10 @@ public class RegisterPlayer : RegisterTile, IServerSpawn
 			//back to original layer
 			foreach (SpriteRenderer spriteRenderer in spriteRenderers)
 			{
-				spriteRenderer.sortingLayerName = "Players";
+				if (playerScript.IsGhost)
+					spriteRenderer.sortingLayerName = "Ghosts";
+				else
+					spriteRenderer.sortingLayerName = "Players";
 			}
 			playerDirectional.LockDirection = false;
 		}
@@ -150,23 +154,23 @@ public class RegisterPlayer : RegisterTile, IServerSpawn
 	[Server]
 	public void ServerSlip(bool slipWhileWalking = false)
 	{
-		if ( this == null )
+		if (this == null)
 		{
 			return;
 		}
 		// Don't slip while walking unless its enabled with "slipWhileWalking".
 		// Don't slip while player's consious state is crit, soft crit, or dead.
-		if ( IsSlippingServer
+		if (IsSlippingServer
 			|| !slipWhileWalking && playerScript.PlayerSync.SpeedServer <= playerScript.playerMove.WalkSpeed
-		    || playerScript.playerHealth.IsCrit
-		    || playerScript.playerHealth.IsSoftCrit
-		    || playerScript.playerHealth.IsDead)
+			|| playerScript.playerHealth.IsCrit
+			|| playerScript.playerHealth.IsSoftCrit
+			|| playerScript.playerHealth.IsDead)
 		{
 			return;
 		}
 
 		ServerStun();
-		SoundManager.PlayNetworkedAtPos("Slip", WorldPositionServer, Random.Range(0.9f, 1.1f));
+		SoundManager.PlayNetworkedAtPos("Slip", WorldPositionServer, Random.Range(0.9f, 1.1f), sourceObj: gameObject);
 		// Let go of pulled items.
 		playerScript.pushPull.ServerStopPulling();
 	}
@@ -212,8 +216,8 @@ public class RegisterPlayer : RegisterTile, IServerSpawn
 
 		OnSlipChangeServer.Invoke(oldVal, IsSlippingServer);
 
-		if ( playerScript.playerHealth.ConsciousState == ConsciousState.CONSCIOUS
-		     || playerScript.playerHealth.ConsciousState == ConsciousState.BARELY_CONSCIOUS)
+		if (playerScript.playerHealth.ConsciousState == ConsciousState.CONSCIOUS
+			 || playerScript.playerHealth.ConsciousState == ConsciousState.BARELY_CONSCIOUS)
 		{
 			playerScript.playerMove.allowInput = true;
 		}

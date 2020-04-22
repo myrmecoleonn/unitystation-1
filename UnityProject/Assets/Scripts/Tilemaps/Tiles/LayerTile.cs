@@ -1,12 +1,12 @@
 ﻿using System;
 using UnityEngine;
 
-
+[Serializable]
 public class LayerTile : GenericTile
 {
 	[Tooltip("Name to dispay to the player for this tile.")]
 	[SerializeField]
-	private string displayName;
+	private string displayName = null;
 
 	/// <summary>
 	/// Name to display to the player for this tile. Defaults to the tile type.

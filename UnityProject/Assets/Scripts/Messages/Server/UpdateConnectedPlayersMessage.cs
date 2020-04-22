@@ -9,17 +9,16 @@ using UnityEngine.Experimental.XR;
 /// </summary>
 public class UpdateConnectedPlayersMessage : ServerMessage
 {
-	public static short MessageType = (short) MessageTypes.UpdateConnectedPlayersMessage;
 	public ClientConnectedPlayer[] Players;
 
-	public override IEnumerator Process()
+	public override void Process()
 	{
 //		Logger.Log("Processed " + ToString());
 		if (PlayerList.Instance == null || PlayerList.Instance.ClientConnectedPlayers == null)
 		{
-			yield break;
+			return;
 		}
-		
+
 		if (Players != null)
 		{
 			Logger.LogFormat("This client got an updated PlayerList state: {0}", Category.Connections, string.Join(",", Players));
@@ -32,7 +31,7 @@ public class UpdateConnectedPlayersMessage : ServerMessage
 
 		PlayerList.Instance.RefreshPlayerListText();
 		UIManager.Display.jobSelectWindow.GetComponent<GUI_PlayerJobs>().UpdateJobsList();
-		yield return null;
+		UIManager.Display.preRoundWindow.GetComponent<GUI_PreRoundWindow>().UpdatePlayerCount(Players?.Length ?? 0);
 	}
 
 	public static UpdateConnectedPlayersMessage Send()
@@ -78,10 +77,5 @@ public class UpdateConnectedPlayersMessage : ServerMessage
 
 		msg.SendToAll();
 		return msg;
-	}
-
-	public override string ToString()
-	{
-		return $"[UpdateConnectedPlayersMessage Type={MessageType} Players={string.Join(", ", Players)}]";
 	}
 }

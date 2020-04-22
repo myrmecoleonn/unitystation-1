@@ -16,13 +16,13 @@ public class ItemStorageStructure : ScriptableObject
 	[Tooltip("Number of unnamed slots in this structure, accessible via slot index. Note that setting" +
 	         "this to 0 indicates there are no indexed slots. Setting this to 1 means there is 1 indexed" +
 	         " slot with index 0. Setting this to 2 means there are 2 indexed slots, with index 0 and 1 respectively.")]
-	private int indexedSlots;
+	private int indexedSlots = 0;
 	public int IndexedSlots => indexedSlots;
 
 	[SerializeField]
 	[FormerlySerializedAs("NamedSlots")]
 	[Tooltip("Available named slots in this structure, accessible via enum. Must not contain duplicates")]
-	private NamedSlot[] namedSlots;
+	private NamedSlot[] namedSlots = null;
 	public NamedSlot[] NamedSlots => namedSlots;
 
 

@@ -12,12 +12,12 @@ using Random = System.Random;
 
 [RequireComponent(typeof(Integrity))]
 [RequireComponent(typeof(CustomNetTransform))]
-public class Attributes : NetworkBehaviour, IRightClickable, IServerSpawn
+public class Attributes : NetworkBehaviour, IRightClickable, IServerSpawn, IExaminable
 {
 
 	[Tooltip("Display name of this item when spawned.")]
 	[SerializeField]
-	private string initialName;
+	private string initialName = null;
 
 	[SyncVar(hook = nameof(SyncArticleName))]
 	private string articleName;
@@ -28,14 +28,19 @@ public class Attributes : NetworkBehaviour, IRightClickable, IServerSpawn
 
 	public string InitialName => initialName;
 
+	public string InitialDescription => initialDescription;
+
 	[Tooltip("Description of this item when spawned.")]
 	[SerializeField]
-	private string initialDescription;
+	private string initialDescription = null;
 
+	[Tooltip("Will this item highlight on mouseover?")]
+	[SerializeField]
+	private bool willHighlight = true;
 
 	[Tooltip("How much does one of these sell for when shipped on the cargo shuttle?")]
 	[SerializeField]
-	private int exportCost;
+	private int exportCost = 0;
 	public int ExportCost
 	{
 		get
@@ -54,12 +59,12 @@ public class Attributes : NetworkBehaviour, IRightClickable, IServerSpawn
 
 	[Tooltip("Should an alternate name be used when displaying this in the cargo console report?")]
 	[SerializeField]
-	private string exportName;
+	private string exportName = null;
 	public string ExportName => exportName;
 
 	[Tooltip("Additional message to display in the cargo console report.")]
 	[SerializeField]
-	private string exportMessage;
+	private string exportMessage = null;
 	public string ExportMessage => exportMessage;
 
 	[SyncVar(hook = nameof(SyncArticleDescription))]
@@ -72,8 +77,8 @@ public class Attributes : NetworkBehaviour, IRightClickable, IServerSpawn
 
 	public override void OnStartClient()
 	{
-		SyncArticleName(articleName, this.name);
-		SyncArticleDescription(articleDescription, this.articleDescription);
+		SyncArticleName(articleName, articleName);
+		SyncArticleDescription(articleDescription, articleDescription);
 		base.OnStartClient();
 	}
 
@@ -101,8 +106,10 @@ public class Attributes : NetworkBehaviour, IRightClickable, IServerSpawn
 	/// </summary>
 	public void OnHoverStart()
 	{
-		Highlight.HighlightThis(gameObject);
-
+		if(willHighlight)
+		{
+			Highlight.HighlightThis(gameObject);
+		}
 		string displayName = null;
 		if (string.IsNullOrWhiteSpace(articleName))
 		{
@@ -128,7 +135,7 @@ public class Attributes : NetworkBehaviour, IRightClickable, IServerSpawn
 	}
 
 
-	// Sends examine event to all monobehaviors on gameobject
+	// Sends examine event to all monobehaviors on gameobject - keep for now - TODO: integrate w shift examine
 	public void SendExamine()
 	{
 		SendMessage("OnExamine");
@@ -136,10 +143,29 @@ public class Attributes : NetworkBehaviour, IRightClickable, IServerSpawn
 
 	private void OnExamine()
 	{
-		if (!string.IsNullOrEmpty(initialDescription))
+		RequestExamineMessage.Send(GetComponent<NetworkIdentity>().netId);
+	}
+
+	// Initial implementation of shift examine behaviour
+	public string Examine(Vector3 worldPos)
+	{
+		string displayName = "<error>";
+		if (string.IsNullOrWhiteSpace(articleName))
 		{
-			Chat.AddExamineMsgToClient(initialDescription);
+			displayName = gameObject.ExpensiveName();
 		}
+		else
+		{
+			displayName = articleName;
+		}
+
+		string str = "This is a " + displayName + ".";
+
+		if (!string.IsNullOrEmpty(ArticleDescription))
+		{
+			str = str + " " + ArticleDescription;
+		}
+		return str;
 	}
 
 	public RightClickableResult GenerateRightClickOptions()

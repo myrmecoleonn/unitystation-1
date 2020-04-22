@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using Mirror;
 using Antagonists;
 
@@ -13,10 +11,14 @@ public class Mind
 	public PlayerScript ghost;
 	public PlayerScript body;
 	private SpawnedAntag Antag;
-	public bool IsAntag => Antag !=null;
+	public bool IsAntag => Antag != null;
 	public bool IsGhosting;
 	public bool DenyCloning;
 	public int bodyMobID;
+	public StepType stepType = StepType.Barefoot;
+	public ChatModifier inventorySpeechModifiers = ChatModifier.None;
+	//Current way to check if it's not actually a ghost but a spectator, should set this not have it be the below.
+	public bool IsSpectator => occupation == null || body == null;
 
 	//use Create to create a mind.
 	private Mind()
@@ -33,6 +35,19 @@ public class Mind
 		var mind = new Mind {occupation = occupation};
 		var playerScript = player.GetComponent<PlayerScript>();
 		mind.SetNewBody(playerScript);
+	}
+
+	/// <summary>
+	/// Create as a Ghost
+	/// </summary>
+	/// <param name="player"></param>
+	public static void Create(GameObject player)
+	{
+		var playerScript = player.GetComponent<PlayerScript>();
+		var mind = new Mind { };
+		playerScript.mind = mind;
+		//Forces you into ghosting, the IsGhosting field should make it so it never points to Body
+		mind.Ghosting(player);
 	}
 
 	public void SetNewBody(PlayerScript playerScript)
@@ -85,40 +100,40 @@ public class Mind
 		IsGhosting = false;
 	}
 
-	public bool ConfirmClone(int recordMobID)
+	/// <summary>
+	/// Get the cloneable status of the player's mind, relative to the passed mob ID.
+	/// </summary>
+	public CloneableStatus GetCloneableStatus(int recordMobID)
 	{
-		if(bodyMobID != recordMobID){  //an old record might still exist even after several body swaps
-			return false;
+		if (bodyMobID != recordMobID)
+		{  //an old record might still exist even after several body swaps
+			return CloneableStatus.OldRecord;
 		}
-		if(DenyCloning)
+		if (DenyCloning)
 		{
-			return false;
+			return CloneableStatus.DenyingCloning;
 		}
 		var currentMob = GetCurrentMob();
-		if(!IsGhosting)
+		if (!IsGhosting)
 		{
 			var livingHealthBehaviour = currentMob.GetComponent<LivingHealthBehaviour>();
-			if(!livingHealthBehaviour.IsDead)
+			if (!livingHealthBehaviour.IsDead)
 			{
-				return false;
+				return CloneableStatus.StillAlive;
 			}
 		}
-		if(!IsOnline(currentMob))
+		if (!IsOnline(currentMob))
 		{
-			return false;
+			return CloneableStatus.Offline;
 		}
 
-		return true;
+		return CloneableStatus.Cloneable;
 	}
 
 	public bool IsOnline(GameObject currentMob)
 	{
 		NetworkConnection connection = currentMob.GetComponent<NetworkIdentity>().connectionToClient;
-		if (PlayerList.Instance.ContainsConnection(connection) == false)
-		{
-			return false;
-		}
-		return true;
+		return PlayerList.Instance.ContainsConnection(connection);
 	}
 
 	/// <summary>
@@ -129,5 +144,4 @@ public class Mind
 		if (!IsAntag) return;
 		Chat.AddExamineMsgFromServer(body.gameObject, Antag.GetObjectivesForPlayer());
 	}
-
 }

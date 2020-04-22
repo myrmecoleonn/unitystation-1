@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using Atmospherics;
+using Chemistry;
 using UnityEngine;
 using Mirror;
 using UnityEngine.Events;
@@ -21,6 +22,8 @@ public class Welder : NetworkBehaviour, IInteractable<HandActivate>, IServerSpaw
 
 	public SpriteRenderer flameRenderer;
 
+	public Chemistry.Reagent fuel;
+
 	/// <summary>
 	/// Invoked server side when welder turns off for any reason.
 	/// </summary>
@@ -28,13 +31,12 @@ public class Welder : NetworkBehaviour, IInteractable<HandActivate>, IServerSpaw
 	public UnityEvent OnWelderOffServer = new UnityEvent();
 
 	//Inhands
-	private int leftHandOriginal;
-	private int rightHandOriginal;
+	private int leftHandOriginal = 0;
+	private int rightHandOriginal = 0;
 	private int leftHandFlame;
 	private int rightHandFlame;
 
 	private bool isBurning = false;
-	private float burnRate = 0.2f;
 
 	public float damageOn;
 	private float damageOff;
@@ -57,7 +59,7 @@ public class Welder : NetworkBehaviour, IInteractable<HandActivate>, IServerSpaw
 
 	private ReagentContainer reagentContainer;
 
-	private float FuelAmount => reagentContainer.AmountOfReagent("welding_fuel");
+	private float FuelAmount => reagentContainer[fuel] ?? 0;
 
 	void Awake()
 	{
@@ -67,10 +69,16 @@ public class Welder : NetworkBehaviour, IInteractable<HandActivate>, IServerSpaw
 	private void EnsureInit()
 	{
 		if (pickupable != null) return;
+
 		pickupable = GetComponent<Pickupable>();
-		reagentContainer = GetComponent<ReagentContainer>();
 		itemAtts = GetComponent<ItemAttributesV2>();
 		registerTile = GetComponent<RegisterTile>();
+
+		reagentContainer = GetComponent<ReagentContainer>();
+		if (reagentContainer != null)
+		{
+			reagentContainer.OnSpillAllContents.AddListener(ServerEmptyWelder);
+		}
 
 		damageOff = itemAtts.ServerHitDamage;
 
@@ -95,6 +103,12 @@ public class Welder : NetworkBehaviour, IInteractable<HandActivate>, IServerSpaw
 	public void ServerPerformInteraction(HandActivate interaction)
 	{
 		ServerToggleWelder(interaction.Performer);
+	}
+
+	[Server]
+	public void ServerEmptyWelder()
+	{
+		SyncIsOn(isOn, false);
 	}
 
 	[Server]
@@ -209,5 +223,4 @@ public class Welder : NetworkBehaviour, IInteractable<HandActivate>, IServerSpaw
 			yield return WaitFor.Seconds(.1f);
 		}
 	}
-
 }

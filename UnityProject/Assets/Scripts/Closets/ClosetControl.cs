@@ -18,11 +18,15 @@ public class ClosetControl : NetworkBehaviour, ICheckedInteractable<HandApply> ,
 	[Tooltip("Contents that will spawn inside every instance of this locker when the" +
 	         " locker spawns.")]
 	[SerializeField]
-	private SpawnableList initialContents;
+	private SpawnableList initialContents = null;
 
 	[Tooltip("Lock light status indicator component")]
 	[SerializeField]
-	private LockLightController lockLight;
+	private LockLightController lockLight = null;
+
+	[Tooltip("Whether the container can be locked.")]
+	[SerializeField]
+	private bool IsLockable = false;
 
 	[Tooltip("Max amount of players that can fit in it at once.")]
 	[SerializeField]
@@ -39,7 +43,7 @@ public class ClosetControl : NetworkBehaviour, ICheckedInteractable<HandApply> ,
 
 	[Tooltip("Sprite to show when door is open.")]
 	[SerializeField]
-	private Sprite doorOpened;
+	private Sprite doorOpened = null;
 
 	[Tooltip("Renderer for the whole locker")]
 	[SerializeField]
@@ -77,6 +81,16 @@ public class ClosetControl : NetworkBehaviour, ICheckedInteractable<HandApply> ,
 	/// Current status of the closet, valid client / server side.
 	/// </summary>
 	public ClosetStatus ClosetStatus => statusSync;
+
+	private AccessRestrictions accessRestrictions;
+	public AccessRestrictions AccessRestrictions {
+		get {
+			if ( !accessRestrictions ) {
+				accessRestrictions = GetComponent<AccessRestrictions>();
+			}
+			return accessRestrictions;
+		}
+	}
 
 	[SyncVar(hook = nameof(SyncStatus))]
 	private ClosetStatus statusSync;
@@ -126,6 +140,9 @@ public class ClosetControl : NetworkBehaviour, ICheckedInteractable<HandApply> ,
 
 	private void OnWillDestroyServer(DestructionInfo arg0)
 	{
+		// failsafe: drop all contents immediately
+		ServerHandleContentsOnStatusChange(false);
+
 		//force it open so it drops its contents
 		SyncLocked(isLocked, false);
 		SyncStatus(statusSync, ClosetStatus.Open);
@@ -160,9 +177,17 @@ public class ClosetControl : NetworkBehaviour, ICheckedInteractable<HandApply> ,
 			}
 		}
 
-		//always spawn closed and unlocked
+		//always spawn closed, all lockable closets locked
 		SyncStatus(statusSync, ClosetStatus.Closed);
-		SyncLocked(isLocked, false);
+		if(IsLockable)
+		{
+			SyncLocked(isLocked, true);
+		}
+		else
+		{
+			SyncLocked(isLocked, false);
+		}
+
 
 		//if this is a mapped spawn, stick any items mapped on top of us in
 		if (info.SpawnType == SpawnType.Mapped)
@@ -255,7 +280,7 @@ public class ClosetControl : NetworkBehaviour, ICheckedInteractable<HandApply> ,
 	[Server]
 	public void ServerToggleClosed(bool? nowClosed = null)
 	{
-		SoundManager.PlayNetworkedAtPos(soundOnOpenOrClose, registerTile.WorldPositionServer, 1f);
+		SoundManager.PlayNetworkedAtPos(soundOnOpenOrClose, registerTile.WorldPositionServer, 1f, sourceObj: gameObject);
 		ServerSetIsClosed(nowClosed.GetValueOrDefault(!IsClosed));
 	}
 
@@ -273,16 +298,16 @@ public class ClosetControl : NetworkBehaviour, ICheckedInteractable<HandApply> ,
 		{
 			if(serverHeldPlayers.Count > 0 && registerTile.closetType == ClosetType.SCANNER)
 			{
-				SyncStatus(statusSync, ClosetStatus.ClosedWithOccupant);
+				statusSync = ClosetStatus.ClosedWithOccupant;
 			}
 			else
 			{
-				SyncStatus(statusSync, ClosetStatus.Closed);
+				statusSync = ClosetStatus.Closed;
 			}
 		}
 		else
 		{
-			SyncStatus(statusSync, ClosetStatus.Open);
+			statusSync = ClosetStatus.Open;
 		}
 
 	}
@@ -333,7 +358,7 @@ public class ClosetControl : NetworkBehaviour, ICheckedInteractable<HandApply> ,
 	[Server]
 	public void ServerToggleLocked(bool? nowLocked = null)
 	{
-		SyncLocked(isLocked, nowLocked.GetValueOrDefault(!IsLocked));
+		isLocked = nowLocked.GetValueOrDefault(!IsLocked);
 	}
 
 	private void SyncLocked(bool oldValue, bool value)
@@ -365,16 +390,49 @@ public class ClosetControl : NetworkBehaviour, ICheckedInteractable<HandApply> ,
 
 	public void ServerPerformInteraction(HandApply interaction)
 	{
-		// Is the player trying to put something in the closet
-		if (interaction.HandObject != null && !IsClosed)
+		// Is the player trying to put something in the closet?
+		if (interaction.HandObject != null)
 		{
-			Vector3 targetPosition = interaction.TargetObject.WorldPosServer().RoundToInt();
-			Vector3 performerPosition = interaction.Performer.WorldPosServer();
-			Inventory.ServerDrop(interaction.HandSlot, targetPosition - performerPosition);
+			if (!IsClosed)
+			{
+				Vector3 targetPosition = interaction.TargetObject.WorldPosServer().RoundToInt();
+				Vector3 performerPosition = interaction.Performer.WorldPosServer();
+				Inventory.ServerDrop(interaction.HandSlot, targetPosition - performerPosition);
+			}
 		}
-		else if (!isLocked)
+		else
 		{
-			ServerToggleClosed();
+			// player want to close locker?
+			if (!isLocked)
+			{
+				ServerToggleClosed();
+			}
+		}
+
+
+		// player trying to unlock locker?
+		if (IsLockable && AccessRestrictions != null)
+		{
+			// player trying to open lock by card?
+			if (AccessRestrictions.CheckAccessCard(interaction.HandObject))
+			{
+				if (isLocked)
+				{
+					SyncLocked(isLocked, false);
+				}
+				else
+				{
+					SyncLocked(isLocked, true);
+				}
+			}
+			// player with access can unlock just by click
+			else if (AccessRestrictions.CheckAccess(interaction.Performer))
+			{
+				if (isLocked)
+				{
+					SyncLocked(isLocked, false);
+				}
+			}
 		}
 	}
 
@@ -393,6 +451,9 @@ public class ClosetControl : NetworkBehaviour, ICheckedInteractable<HandApply> ,
 		}
 	}
 
+	/// <summary>
+	/// Removes all items currently inside of the closet
+	/// </summary>
 	private void OpenItemHandling()
 	{
 		foreach (ObjectBehaviour item in serverHeldItems)
@@ -446,6 +507,9 @@ public class ClosetControl : NetworkBehaviour, ICheckedInteractable<HandApply> ,
 		}
 	}
 
+	/// <summary>
+	/// Removes all players currently inside of the closet
+	/// </summary>
 	private void OpenPlayerHandling()
 	{
 		foreach (ObjectBehaviour player in serverHeldPlayers)
@@ -458,11 +522,14 @@ public class ClosetControl : NetworkBehaviour, ICheckedInteractable<HandApply> ,
 			player.parentContainer = null;
 
 			//Stop tracking closet
-			FollowCameraMessage.Send(player.gameObject, null);
+			FollowCameraMessage.Send(player.gameObject, player.gameObject);
 		}
 		serverHeldPlayers = new List<ObjectBehaviour>();
 	}
 
+	/// <summary>
+	/// Adds all players currently sitting on this closet into the closet
+	/// </summary>
 	private void ClosePlayerHandling()
 	{
 		var mobsFound = Matrix.Get<ObjectBehaviour>(registerTile.LocalPositionServer, ObjectType.Player, true);
@@ -518,7 +585,8 @@ public class ClosetControl : NetworkBehaviour, ICheckedInteractable<HandApply> ,
 
 		if (WillInteract(HandApply.ByLocalPlayer(gameObject), NetworkSide.Client))
 		{
-			result.AddElement("OpenClose", RightClickInteract);
+			var optionName = IsClosed ? "Open" : "Close";
+			result.AddElement("OpenClose", RightClickInteract, nameOverride: optionName);
 		}
 
 
@@ -530,9 +598,6 @@ public class ClosetControl : NetworkBehaviour, ICheckedInteractable<HandApply> ,
 		InteractionUtils.RequestInteract(HandApply.ByLocalPlayer(gameObject), this);
 	}
 }
-
-
-
 
 public enum ClosetStatus
 {

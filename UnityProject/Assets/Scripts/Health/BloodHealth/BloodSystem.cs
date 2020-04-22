@@ -42,10 +42,8 @@ public class BloodSystem : MonoBehaviour
 	private float toxinLevel = 0;
 	private LivingHealthBehaviour livingHealthBehaviour;
 	private DNAandBloodType bloodType;
-	private readonly float bleedRate = 2f;
 	public float BloodLevel = (int)BloodVolume.NORMAL;
 	public bool IsBleeding { get; private set; }
-	private float tickRate = 1f;
 	private float tick = 0f;
 
 	private BloodSplatType bloodSplatColor;
@@ -57,13 +55,12 @@ public class BloodSystem : MonoBehaviour
 
 	void OnEnable()
 	{
-		UpdateManager.Instance.Add(UpdateMe);
+		UpdateManager.Add(CallbackType.UPDATE, UpdateMe);
 	}
 
 	void OnDisable()
 	{
-		if (UpdateManager.Instance != null)
-			UpdateManager.Instance.Remove(UpdateMe);
+		UpdateManager.Remove(CallbackType.UPDATE, UpdateMe);
 	}
 
 	//Initial setting for blood type. Server only

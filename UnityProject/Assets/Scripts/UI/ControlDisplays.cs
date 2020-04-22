@@ -13,6 +13,7 @@ public class ControlDisplays : MonoBehaviour
 		Lobby,
 		Game,
 		PreRound,
+		Joining,
 		TeamSelect,
 		JobSelect
 	}
@@ -21,12 +22,15 @@ public class ControlDisplays : MonoBehaviour
 	public GameObject jobSelectWindow;
 	public GameObject preRoundWindow;
 	public GameObject teamSelectionWindow;
+	public GameObject disclaimer;
 	public RectTransform panelRight;
 
 	[SerializeField]
-	private GameObject rightClickManager;
+	private GameObject rightClickManager = null;
 
-	[SerializeField] private Animator uiAnimator;
+	[SerializeField] private Animator uiAnimator = null;
+	[SerializeField] private VideoPlayerController videoController = null;
+	public VideoPlayerController VideoPlayer => videoController;
 
 	void OnEnable()
 	{
@@ -68,6 +72,31 @@ public class ControlDisplays : MonoBehaviour
 		}
 	}
 
+	void Update()
+	{
+		TempFixMissingRightHud();
+	}
+
+	//Temp fix for strange bug where right hud is missing when joining headless server
+	void TempFixMissingRightHud()
+	{
+		if (CustomNetworkManager.Instance == null) return;
+		if (CustomNetworkManager.Instance._isServer) return;
+		if (PlayerManager.LocalPlayerScript == null) return;
+		if (PlayerManager.LocalPlayerScript.playerHealth == null) return;
+		if (!PlayerManager.LocalPlayerScript.playerHealth.IsDead &&
+		    !UIManager.PlayerHealthUI.gameObject.activeInHierarchy)
+		{
+			UIManager.PlayerHealthUI.gameObject.SetActive(true);
+		}
+		if (!PlayerManager.LocalPlayerScript.playerHealth.IsDead &&
+		    !UIManager.PlayerHealthUI.humanUI)
+		{
+			UIManager.PlayerHealthUI.humanUI = true;
+		}
+
+	}
+
 	void HumanUI()
 	{
 		if (hudBottomHuman != null && hudBottomGhost != null)
@@ -78,6 +107,8 @@ public class ControlDisplays : MonoBehaviour
 		UIManager.PlayerHealthUI.gameObject.SetActive(true);
 		panelRight.gameObject.SetActive(true);
 		rightClickManager.SetActive(true);
+		preRoundWindow.SetActive(false);
+		SoundManager.SongTracker.Stop();
 	}
 
 	void GhostUI()
@@ -90,6 +121,8 @@ public class ControlDisplays : MonoBehaviour
 		UIManager.PlayerHealthUI.gameObject.SetActive(true);
 		panelRight.gameObject.SetActive(true);
 		rightClickManager.SetActive(true);
+		preRoundWindow.SetActive(false);
+		SoundManager.SongTracker.Stop();
 	}
 
 	/// <summary>
@@ -112,6 +145,9 @@ public class ControlDisplays : MonoBehaviour
 				break;
 			case Screens.PreRound:
 				SetScreenForPreRound();
+				break;
+			case Screens.Joining:
+				SetScreenForJoining();
 				break;
 			case Screens.TeamSelect:
 				SetScreenForTeamSelect();
@@ -139,7 +175,7 @@ public class ControlDisplays : MonoBehaviour
 		SoundManager.SongTracker.StartPlayingRandomPlaylist();
 		ResetUI(); //Make sure UI is back to default for next play
 		UIManager.PlayerHealthUI.gameObject.SetActive(false);
-		UIManager.AlertUI.OnRoundEnd();
+		UIActionManager.Instance.OnRoundEnd();
 		hudBottomHuman.SetActive(false);
 		hudBottomGhost.SetActive(false);
 		panelRight.gameObject.SetActive(false);
@@ -147,18 +183,19 @@ public class ControlDisplays : MonoBehaviour
 		jobSelectWindow.SetActive(false);
 		teamSelectionWindow.SetActive(false);
 		preRoundWindow.SetActive(false);
-		GUI_IngameMenu.Instance.disclamerWindow.SetActive(true);
+		disclaimer.SetActive(true);
+		UIManager.Instance.adminChatButtons.transform.parent.gameObject.SetActive(false);
 	}
 
 	public void SetScreenForGame()
 	{
-		GUI_IngameMenu.Instance.disclamerWindow.SetActive(false);
 		hudBottomHuman.SetActive(false);
 		hudBottomGhost.SetActive(false);
 		UIManager.PlayerHealthUI.gameObject.SetActive(true);
 		panelRight.gameObject.SetActive(true);
 		rightClickManager.SetActive(false);
 		uiAnimator.Play("idle");
+		disclaimer.SetActive(false);
 	}
 
 	public void SetScreenForPreRound()
@@ -172,6 +209,21 @@ public class ControlDisplays : MonoBehaviour
 		jobSelectWindow.SetActive(false);
 		teamSelectionWindow.SetActive(false);
 		preRoundWindow.SetActive(true);
+		preRoundWindow.GetComponent<GUI_PreRoundWindow>().SetUIForCountdown();
+	}
+
+	public void SetScreenForJoining()
+	{
+		ResetUI(); //Make sure UI is back to default for next play
+		UIManager.PlayerHealthUI.gameObject.SetActive(false);
+		hudBottomHuman.SetActive(false);
+		hudBottomGhost.SetActive(false);
+		panelRight.gameObject.SetActive(false);
+		rightClickManager.SetActive(false);
+		jobSelectWindow.SetActive(false);
+		teamSelectionWindow.SetActive(false);
+		preRoundWindow.SetActive(true);
+		preRoundWindow.GetComponent<GUI_PreRoundWindow>().SetUIForJoining();
 	}
 
 	public void SetScreenForTeamSelect()
@@ -184,11 +236,6 @@ public class ControlDisplays : MonoBehaviour
 	{
 		preRoundWindow.SetActive(false);
 		jobSelectWindow.SetActive(true);
-	}
-
-	public void PlayNukeDetVideo()
-	{
-		uiAnimator.Play("NukeDetVideo");
 	}
 
 	public void PlayStrandedVideo()

@@ -24,26 +24,17 @@ public class AtmosManager : MonoBehaviour
 	private static float tickCount = 0f;
 	private const int Steps = 5;
 
-	private static AtmosManager atmosManager;
+	public static AtmosManager Instance;
 
-	public static AtmosManager Instance
+	private void Awake()
 	{
-		get
+		if (Instance == null)
 		{
-			if (atmosManager == null)
-			{
-				atmosManager = FindObjectOfType<AtmosManager>();
-			}
-
-			return atmosManager;
+			Instance = this;
 		}
-	}
-
-	private void Start()
-	{
-		if (Mode != AtmosMode.Manual)
+		else
 		{
-			StartSimulation();
+			Destroy(this);
 		}
 	}
 
@@ -105,6 +96,10 @@ public class AtmosManager : MonoBehaviour
 
 	void OnRoundStart()
 	{
+		if (Mode != AtmosMode.Manual)
+		{
+			StartSimulation();
+		}
 		StartCoroutine(SetPipes());
 	}
 
@@ -133,6 +128,8 @@ public class AtmosManager : MonoBehaviour
 
 	public void StartSimulation()
 	{
+		if (!CustomNetworkManager.Instance._isServer) return;
+
 		Running = true;
 
 		if (Mode == AtmosMode.Threaded)
@@ -144,6 +141,8 @@ public class AtmosManager : MonoBehaviour
 
 	public void StopSimulation()
 	{
+		if (!CustomNetworkManager.Instance._isServer) return;
+
 		Running = false;
 
 		AtmosThread.Stop();

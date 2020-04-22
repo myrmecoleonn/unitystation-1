@@ -5,7 +5,7 @@ using Mirror;
 
 public class StandardCable : CableInheritance
 {
-	public HashSet<PowerTypeCategory> CanConnectTo = new HashSet<PowerTypeCategory>
+	public new HashSet<PowerTypeCategory> CanConnectTo = new HashSet<PowerTypeCategory>
 	{
 		PowerTypeCategory.StandardCable,
 		PowerTypeCategory.FieldGenerator,
@@ -17,7 +17,7 @@ public class StandardCable : CableInheritance
 		PowerTypeCategory.PowerSink
 	};
 
-	public override void _OnStartServer()
+	void Awake()
 	{
 		ApplianceType = PowerTypeCategory.StandardCable;
 		CableType = WiringColor.red;

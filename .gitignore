@@ -7,6 +7,7 @@
 /UnityProject/[Bb]uilds/
 /UnityProject/[Ll]ogs/
 /UnityProject/Assets/AssetStoreTools*
+/UnityProject/Assets/StreamingAssets/chatLogs*
 /UnityProject/Assets/InitTestScene*
 /UnityProject/Assets/MHLab*
 /UnityProject/PATCH*
@@ -14,14 +15,13 @@
 /UnityProject/.vs/
 .vs
 /UnityProject/Assets/Resources/BuildPrefs.json
-/UnityProject/Assets/StreamingAssets/config/
 
 /Assets/Photon\ Unity\ Networking/
 /Assets/PhotonChatApi
 /[Ll]ibrary/
 /[Tt]emp/
-**/[Oo]bj/
-**/[Bb]in/
+#**/[Oo]bj/
+#**/[Bb]in/
 /[Bb]uild/
 /[Bb]uilds/
 /Assets/AssetStoreTools*
@@ -101,3 +101,4 @@ UnityProject/Assets/StreamingAssets/admin/admins.txt
 UnityProject/Assets/StreamingAssets/admin/admins.txt.meta
 UnityProject/Assets/StreamingAssets/admin/banlist.json
 UnityProject/Assets/StreamingAssets/admin/banlist.json.meta
+UnityProject/booster.beam

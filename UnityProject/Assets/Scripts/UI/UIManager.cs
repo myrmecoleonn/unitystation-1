@@ -1,10 +1,13 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using AdminTools;
 using Mirror;
 using UI.UI_Bottom;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 using Unitystation.Options;
@@ -24,7 +27,6 @@ public class UIManager : MonoBehaviour
 	public ControlIntent intentControl;
 	public PlayerHealthUI playerHealthUI;
 	public PlayerListUI playerListUIControl;
-	public AlertUI alertUI;
 	public Text toolTip;
 	public Text pingDisplay;
 	[SerializeField]
@@ -39,6 +41,9 @@ public class UIManager : MonoBehaviour
 	public static GamePad GamePad => Instance.gamePad;
 	public GamePad gamePad;
 	public AnimationCurve strandedZoomOutCurve;
+	public AdminChatButtons adminChatButtons;
+	public AdminChatWindows adminChatWindows;
+	public PlayerAlerts playerAlerts;
 	private bool preventChatInput;
 
 	public static bool PreventChatInput
@@ -111,7 +116,6 @@ public class UIManager : MonoBehaviour
 
 	//		public static ControlChat Chat => Instance.chatControl; //Use ChatRelay.Instance.AddToChatLog instead!
 	public static PlayerHealthUI PlayerHealthUI => Instance.playerHealthUI;
-	public static AlertUI AlertUI => Instance.alertUI;
 
 	public static Hands Hands => Instance.hands;
 
@@ -212,9 +216,25 @@ public class UIManager : MonoBehaviour
 			ttsToggle = PlayerPrefs.GetInt(PlayerPrefKeys.TTSToggleKey) == 1;
 		}
 
-
-
+		adminChatButtons.transform.parent.gameObject.SetActive(false);
 		SetVersionDisplay = $"Work In Progress {GameData.BuildNumber}";
+	}
+
+	private void OnEnable()
+	{
+		SceneManager.activeSceneChanged += OnSceneChange;
+	}
+
+	private void OnDisable()
+	{
+		SceneManager.activeSceneChanged -= OnSceneChange;
+	}
+
+	void OnSceneChange(Scene oldScene, Scene newScene)
+	{
+		adminChatButtons.ClearAllNotifications();
+		adminChatWindows.ResetAll();
+		playerAlerts.ClearLogs();
 	}
 
 	void DetermineInitialTargetFrameRate()

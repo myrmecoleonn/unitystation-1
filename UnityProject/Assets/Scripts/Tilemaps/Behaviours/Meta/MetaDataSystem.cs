@@ -36,15 +36,12 @@ public class MetaDataSystem : SubsystemBehaviour
 
 	void OnEnable()
 	{
-		UpdateManager.Instance.Add(UpdateMe);
+		UpdateManager.Add(CallbackType.UPDATE, UpdateMe);
 	}
 
 	void OnDisable()
 	{
-		if (UpdateManager.Instance != null)
-		{
-			UpdateManager.Instance.Remove(UpdateMe);
-		}
+		UpdateManager.Remove(CallbackType.UPDATE, UpdateMe);
 	}
 
 	public override void Initialize()
@@ -55,6 +52,11 @@ public class MetaDataSystem : SubsystemBehaviour
 		if (MatrixManager.IsInitialized)
 		{
 			LocateRooms();
+			Stopwatch Dsw = new Stopwatch();
+			Dsw.Start();
+			matrix.UnderFloorLayer.InitialiseUnderFloorUtilities();
+			Dsw.Stop();
+			Logger.Log("Initialise Station Utilities (Power cables, Atmos pipes): " + Dsw.ElapsedMilliseconds + " ms", Category.Matrix);
 		}
 
 		sw.Stop();
@@ -99,6 +101,7 @@ public class MetaDataSystem : SubsystemBehaviour
 			FindRoomAt(position);
 		}
 	}
+
 
 	private void FindRoomAt(Vector3Int position)
 	{
@@ -261,6 +264,8 @@ public class MetaDataSystem : SubsystemBehaviour
 
 	void UpdateMe()
 	{
+		if (CustomNetworkManager.Instance._isServer == false) return;
+
 		foreach (MetaDataNode node in externalNodes.Keys)
 		{
 			subsystemManager.UpdateAt(node.Position);

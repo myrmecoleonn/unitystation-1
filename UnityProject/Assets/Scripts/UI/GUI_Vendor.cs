@@ -2,7 +2,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Experimental.PlayerLoop;
 using Random = UnityEngine.Random;
 
 public class GUI_Vendor : NetTab
@@ -15,9 +14,9 @@ public class GUI_Vendor : NetTab
 	private Vendor vendor;
 	private List<VendorItem> vendorContent = new List<VendorItem>();
 	[SerializeField]
-	private EmptyItemList itemList;
+	private EmptyItemList itemList = null;
 	[SerializeField]
-	private NetColorChanger hullColor;
+	private NetColorChanger hullColor = null;
 	private bool inited = false;
 	[SerializeField]
 	private string deniedMessage = "Bzzt.";
@@ -144,7 +143,7 @@ public class GUI_Vendor : NetTab
 			}
 			cnt.Throw(new ThrowInfo
 			{
-				ThrownBy = gameObject,
+				ThrownBy = spawnedItem,
 				Aim = BodyPartType.Chest,
 				OriginWorldPos = spawnPos,
 				WorldTrajectory = offset,
@@ -169,7 +168,7 @@ public class GUI_Vendor : NetTab
 
 	private void SendToChat(string messageToSend)
 	{
-		Chat.AddLocalMsgToChat(messageToSend, vendor.transform.position);
+		Chat.AddLocalMsgToChat(messageToSend, vendor.transform.position, vendor?.gameObject);
 	}
 
 	private IEnumerator VendorInputCoolDown()

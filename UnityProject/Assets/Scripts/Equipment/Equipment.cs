@@ -11,12 +11,13 @@ using YamlDotNet.Samples;
 /// <summary>
 /// Component which manages all the equipment on a player.
 /// </summary>
-public class Equipment : NetworkBehaviour
+public class Equipment : NetworkBehaviour, IExaminable
 {
 	private Dictionary<NamedSlot, ClothingItem> clothingItems;
 	public bool IsInternalsEnabled;
 	private ItemSlot maskSlot;
 	private ItemStorage itemStorage;
+	public ItemStorage ItemStorage => itemStorage;
 
 	private void Awake()
 	{
@@ -30,6 +31,7 @@ public class Equipment : NetworkBehaviour
 				clothingItems.Add(clothingItem.Slot, clothingItem);
 			}
 		}
+
 		maskSlot = itemStorage.GetNamedItemSlot(NamedSlot.mask);
 		InitInternals();
 	}
@@ -43,7 +45,8 @@ public class Equipment : NetworkBehaviour
 	{
 		foreach (var clothingItem in clothingItems)
 		{
-			PlayerAppearanceMessage.SendTo(gameObject, (int)clothingItem.Key, recipient, clothingItem.Value.GameObjectReference, true, false);
+			PlayerAppearanceMessage.SendTo(gameObject, (int) clothingItem.Key, recipient,
+				clothingItem.Value.GameObjectReference, true, false);
 		}
 	}
 
@@ -123,5 +126,40 @@ public class Equipment : NetworkBehaviour
 	{
 		clothingItems.TryGetValue(namedSlot, out var clothingItem);
 		return clothingItem;
+	}
+
+	/// <summary>
+	/// Gets name and jobtype from ID card worn in ID slot if any.
+	/// </summary>
+	/// <param name="namedSlot"></param>
+	/// <returns></returns>
+	public String GetIdentityFromID()
+	{
+		IDCard card = null;
+		var tryGetItem = ItemSlot.GetNamed(itemStorage, NamedSlot.id).Item;
+		if (tryGetItem != null)
+		{
+			card = tryGetItem.GetComponent<IDCard>();
+		}
+		//Logger.Log("ID Card: " + (card != null ? card.ToString() : "null"));
+		if (card != null)
+		{
+			return card.RegisteredName + " " + (card.Occupation ? $" ({card.Occupation.DisplayName})" : "");
+		}
+		else
+		{
+			return "";
+		}
+	}
+
+	public string Examine(Vector3 worldPos)
+	{
+		// Collect clothing + ID info.
+		string msg = "This is " + GetComponent<PlayerScript>().visibleName + ".";
+
+		// TODO: LOOP over items
+		// msg += blah;
+
+		return msg;
 	}
 }

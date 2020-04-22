@@ -16,7 +16,7 @@ public class ClothingV2 : MonoBehaviour
 	//there's probably no situation where we'd want to re-use the same cloth data on more than one item.
 	[Tooltip("Clothing data describing the various sprites for this clothing.")]
 	[SerializeField]
-	private BaseClothData clothData;
+	private BaseClothData clothData = null;
 
 	[Tooltip("Index of the variant to use. -1 for default.")]
 	[SerializeField]
@@ -24,11 +24,14 @@ public class ClothingV2 : MonoBehaviour
 
 	[Tooltip("Type of variant to use of the clothing data.")]
 	[SerializeField]
-	private ClothingVariantType variantType;
+	private ClothingVariantType variantType = ClothingVariantType.Default;
 
 	[Tooltip("Determine when a piece of clothing hides another")]
 	[SerializeField, EnumFlag]
 	private ClothingHideFlags hideClothingFlags;
+
+	private ItemAttributesV2 myItem;
+	private Pickupable myPickupable;
 
 	private Dictionary<ClothingVariantType, int> variantStore = new Dictionary<ClothingVariantType, int>();
 	private List<int> variantList;
@@ -60,6 +63,8 @@ public class ClothingV2 : MonoBehaviour
 	private void Awake()
 	{
 		spriteHandlerController = GetComponent<SpriteHandlerController>();
+		myItem = GetComponent<ItemAttributesV2>();
+		myPickupable = GetComponent<Pickupable>();
 		TryInit();
 	}
 
@@ -68,7 +73,6 @@ public class ClothingV2 : MonoBehaviour
 	{
 		if (clothData is ClothingData clothingData)
 		{
-			var item = GetComponent<ItemAttributesV2>();
 			spriteInfo = SetUpSheetForClothingData(clothingData);
 			SetUpFromClothingData(clothingData.Base);
 
@@ -94,19 +98,16 @@ public class ClothingV2 : MonoBehaviour
 		}
 		else if (clothData is ContainerData containerData)
 		{
-			var Item = GetComponent<ItemAttributesV2>();
 			this.spriteInfo = SpriteFunctions.SetupSingleSprite(containerData.Sprites.Equipped);
 			SetUpFromClothingData(containerData.Sprites);
 		}
 		else if (clothData is BeltData beltData)
 		{
-			var Item = GetComponent<ItemAttributesV2>();
 			this.spriteInfo = SpriteFunctions.SetupSingleSprite(beltData.sprites.Equipped);
 			SetUpFromClothingData(beltData.sprites);
 		}
 		else if (clothData is HeadsetData headsetData)
 		{
-			var Item = GetComponent<ItemAttributesV2>();
 			var Headset = GetComponent<Headset>();
 			this.spriteInfo = SpriteFunctions.SetupSingleSprite(headsetData.Sprites.Equipped);
 			SetUpFromClothingData(headsetData.Sprites);
@@ -117,28 +118,48 @@ public class ClothingV2 : MonoBehaviour
 	private void SetUpFromClothingData(EquippedData equippedData)
 	{
 		var SpriteSOData = new ItemsSprites();
+		SpriteSOData.Palette = new List<Color>(equippedData.Palette);
 		SpriteSOData.LeftHand = (equippedData.InHandsLeft);
 		SpriteSOData.RightHand = (equippedData.InHandsRight);
 		SpriteSOData.InventoryIcon = (equippedData.ItemIcon);
-		spriteHandlerController.SetSprites(SpriteSOData);
+		SpriteSOData.IsPaletted = equippedData.IsPaletted;
 
+		spriteHandlerController.SetSprites(SpriteSOData);
 	}
 
+
+	public void AssignPaletteToSprites(List<Color> palette)
+	{
+		if (myItem.ItemSprites.IsPaletted)
+		{
+			spriteHandlerController.SetPaletteOfCurrentSprite(palette);
+			clothingItem?.spriteHandler.SetPaletteOfCurrentSprite(palette);
+			myPickupable.SetPalette(palette);
+		}
+	}
 
 
 	private SpriteData SetUpSheetForClothingData(ClothingData clothingData)
 	{
 		var SpriteInfos = new SpriteData();
+
 		SpriteInfos.List = new List<List<List<SpriteHandler.SpriteInfo>>>();
+		SpriteInfos.isPaletteds = new List<bool>();
+		SpriteInfos.palettes = new List<List<Color>>();
 		int c = 0;
 
 		SpriteInfos.List.Add(SpriteFunctions.CompleteSpriteSetup(clothingData.Base.Equipped));
+		SpriteInfos.isPaletteds.Add(clothingData.Base.IsPaletted);
+		SpriteInfos.palettes.Add(new List<Color>(clothingData.Base.Palette));
+
 		variantStore[ClothingVariantType.Default] = c;
 		c++;
 
 		if (clothingData.Base_Adjusted.Equipped.Texture != null)
 		{
 			SpriteInfos.List.Add(SpriteFunctions.CompleteSpriteSetup(clothingData.Base_Adjusted.Equipped));
+			SpriteInfos.isPaletteds.Add(clothingData.Base_Adjusted.IsPaletted);
+			SpriteInfos.palettes.Add(new List<Color>(clothingData.Base_Adjusted.Palette));
 			variantStore[ClothingVariantType.Tucked] = c;
 			c++;
 		}
@@ -146,6 +167,8 @@ public class ClothingV2 : MonoBehaviour
 		if (clothingData.DressVariant.Equipped.Texture != null)
 		{
 			SpriteInfos.List.Add(SpriteFunctions.CompleteSpriteSetup(clothingData.DressVariant.Equipped));
+			SpriteInfos.isPaletteds.Add(clothingData.DressVariant.IsPaletted);
+			SpriteInfos.palettes.Add(new List<Color>(clothingData.DressVariant.Palette));
 			variantStore[ClothingVariantType.Skirt] = c;
 			c++;
 		}
@@ -154,10 +177,13 @@ public class ClothingV2 : MonoBehaviour
 			foreach (var Variant in clothingData.Variants)
 			{
 				SpriteInfos.List.Add(SpriteFunctions.CompleteSpriteSetup(Variant.Equipped));
-				variantStore[ClothingVariantType.Skirt] = c;
+				SpriteInfos.isPaletteds.Add(Variant.IsPaletted);
+				SpriteInfos.palettes.Add(new List<Color>(Variant.Palette));
+				variantStore[ClothingVariantType.Skirt] = c; // Doesn't make sense
 				c++;
 			}
 		}
+
 		return (SpriteInfos);
 	}
 
@@ -175,6 +201,11 @@ public class ClothingV2 : MonoBehaviour
 			clothingItem.RefreshFromClothing(this);
 		}
 	}
+
+	public List<Color> GetPaletteOrNull()
+	{
+		return clothData == null ? null : clothData.GetPaletteOrNull(variantIndex);
+	}
 }
 
 public enum ClothingVariantType
@@ -185,7 +216,7 @@ public enum ClothingVariantType
 }
 
 /// <summary>
-/// Bit flags which determine when a piece of clothing hides another. 
+/// Bit flags which determine when a piece of clothing hides another.
 /// IE a helmet hiding glasses.
 /// </summary>
 [Flags]

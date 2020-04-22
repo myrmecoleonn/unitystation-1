@@ -10,33 +10,41 @@ using UnityEngine.UI;
 public class GUI_Comms : NetTab
 {
 	[SerializeField]
-	private NetPageSwitcher mainSwitcher;
+	private NetPageSwitcher mainSwitcher = null;
 	[SerializeField]
-	private NetPage menuPage;
+	private NetPage menuPage = null;
 
 	[SerializeField]
-	private NetPageSwitcher captainOnlySwitcher;
+	private NetPageSwitcher captainOnlySwitcher = null;
 	[SerializeField]
-	private NetPage noCaptainAccessPage;
+	private NetPage noCaptainAccessPage = null;
 	[SerializeField]
-	private NetPage captainAccessPage;
+	private NetPage captainAccessPage = null;
 
 	[SerializeField]
-	private NetLabel idLabel;
+	private NetLabel idLabel = null;
 	[SerializeField]
-	private NetLabel shuttleStatusLabel;
+	private NetLabel shuttleStatusLabel = null;
 	[SerializeField]
-	private NetLabel shuttleTimerLabel;
+	private NetLabel shuttleTimerLabel = null;
 	[SerializeField]
-	private NetLabel shuttleCallResultLabel;
+	private NetLabel shuttleCallResultLabel = null;
 	[SerializeField]
-	private NetLabel shuttleCallButtonLabel;
+	private NetLabel shuttleCallButtonLabel = null;
 	[SerializeField]
-	private NetSpriteImage statusImage;
+	private NetSpriteImage statusImage = null;
+	[SerializeField]
+	private NetLabel CurrentAlertLevelLabel = null;
+	[SerializeField]
+	private NetLabel NewAlertLevelLabel = null;
+	[SerializeField]
+	private NetLabel AlertErrorLabel = null;
 
 	private CommsConsole console;
 	private EscapeShuttle shuttle;
 	private Coroutine callResultHandle;
+
+	private CentComm.AlertLevel LocalAlertLevel = CentComm.AlertLevel.Green;
 
 	protected override void InitServer()
 	{
@@ -105,7 +113,7 @@ public class GUI_Comms : NetTab
 
 		bool isRecall = shuttle.Status == ShuttleStatus.OnRouteStation;
 
-		var minutes = 2;
+		
 
 		string callResult;
 		bool ok;
@@ -130,6 +138,7 @@ public class GUI_Comms : NetTab
 				ok = shuttle.CallShuttle(out callResult);
 				if ( ok )
 				{
+					var minutes = TimeSpan.FromSeconds(shuttle.InitialTimerSeconds).ToString();
 					CentComm.MakeShuttleCallAnnouncement( minutes, text );
 					RefreshCallButtonText();
 				}
@@ -168,14 +177,59 @@ public class GUI_Comms : NetTab
 	public void MakeAnAnnouncement(string text)
 	{
 		Logger.Log( nameof(MakeAnAnnouncement), Category.NetUI );
-		CentComm.MakeCaptainAnnouncement( text );
+		if (text.Length>200)
+		{
+			CentComm.MakeAnnouncement(CentComm.CaptainAnnounceTemplate, text.Substring(0, 200), CentComm.UpdateSound.announce);
+		}
+		else
+		{
+			CentComm.MakeAnnouncement(CentComm.CaptainAnnounceTemplate, text ,CentComm.UpdateSound.announce);
+		}
 		OpenMenu();
+	}
+	
+	public void UpdateAlertLevelLabels()
+	{
+		CurrentAlertLevelLabel.SetValue = GameManager.Instance.CentComm.CurrentAlertLevel.ToString().ToUpper();
+		NewAlertLevelLabel.SetValue = LocalAlertLevel.ToString().ToUpper();
 	}
 	public void ChangeAlertLevel()
 	{
-		//todo
+		if (GameManager.Instance.stationTime < GameManager.Instance.CentComm.lastAlertChange.AddMinutes(
+			GameManager.Instance.CentComm.coolDownAlertChange))
+		{
+			StartCoroutine(DisplayAlertErrorMessage("Error: recent alert level change detected!"));
+			return;
+		}
+
 		Logger.Log( nameof(ChangeAlertLevel), Category.NetUI );
+		GameManager.Instance.CentComm.lastAlertChange = GameManager.Instance.stationTime;
+		GameManager.Instance.CentComm.ChangeAlertLevel(LocalAlertLevel);
+
+		OpenMenu();
 	}
+
+	IEnumerator DisplayAlertErrorMessage(string text)
+	{
+		AlertErrorLabel.SetValue = text;
+		for (int _i = 0; _i < 5; _i++)
+		{
+			yield return WaitFor.Seconds(1);
+			AlertErrorLabel.SetValue = "";
+			yield return WaitFor.Seconds(1);
+			AlertErrorLabel.SetValue = text;
+		}
+		AlertErrorLabel.SetValue = "";
+		yield break;
+	}
+
+	public void SelectAlertLevel(string levelName)
+	{
+		//TODO require 2 ID's to change to red level
+		LocalAlertLevel =
+			(CentComm.AlertLevel)Enum.Parse(typeof(CentComm.AlertLevel), levelName);
+	}
+
 	public void RequestNukeCodes()
 	{
 		//todo

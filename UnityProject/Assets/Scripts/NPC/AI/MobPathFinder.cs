@@ -24,7 +24,7 @@ public class MobPathFinder : MonoBehaviour
 	private bool arrivedAtTile;
 
 	//For OnDrawGizmos
-	private List<Node> debugPath;
+	private List<Node> debugPath = null;
 	private Dictionary<Vector2, Color> debugSearch = new Dictionary<Vector2, Color>();
 
 	public enum Status
@@ -445,7 +445,7 @@ public class MobPathFinder : MonoBehaviour
 			var getDoor = matrix.GetFirst<DoorController>(checkPos, true);
 			if (getDoor)
 			{
-				if ((int) getDoor.AccessRestrictions.restriction == 0)
+				if ( !getDoor.AccessRestrictions || (int)getDoor.AccessRestrictions.restriction == 0 )
 				{
 					node.nodeType = PathFinding.NodeType.Open;
 				}

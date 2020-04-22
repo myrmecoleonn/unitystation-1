@@ -15,20 +15,20 @@ public class Restraint : MonoBehaviour, ICheckedInteractable<HandApply>
 	/// How long it takes to apply the restraints
 	/// </summary>
 	[SerializeField]
-	private float applyTime;
+	private float applyTime = 0;
 
 	/// <summary>
 	/// How long it takes for another person to remove the restraints
 	/// </summary>
 	[SerializeField]
-	private float removeTime;
+	private float removeTime = 0;
 	public float RemoveTime => removeTime;
 
 	/// <summary>
 	/// How long it takes for self to remove the restraints
 	/// </summary>
 	[SerializeField]
-	private float resistTime;
+	private float resistTime = 0;
 	public float ResistTime => resistTime;
 
 	/// <summary>
@@ -66,7 +66,7 @@ public class Restraint : MonoBehaviour, ICheckedInteractable<HandApply>
 			.ServerStartProgress(target.RegisterTile(), applyTime, performer);
 		if (bar != null)
 		{
-			SoundManager.PlayNetworkedAtPos(sound, target.transform.position);
+			SoundManager.PlayNetworkedAtPos(sound, target.transform.position, sourceObj: target.gameObject);
 		}
 	}
 }

@@ -47,11 +47,25 @@ public enum ChatModifier
 	Mute 	= 1 << 2, // Dead, unconcious or naturally mute
 	Hiss 	= 1 << 3,
 	Clown 	= 1 << 4, // Having the clown occupation
-	Whisper = 1 << 5, // Message starts with "#"
+	Whisper = 1 << 5, // Message starts with "#" or "/w"
 	Yell    = 1 << 6, // Message is in capital letters
-	Emote   = 1 << 7, // Message starts with "/me"
+	Emote   = 1 << 7, // Message starts with "/me" or "*"
 	Exclaim = 1 << 8, // Message ends with a "!"
-	Question= 1 << 9 // Message ends with a "?"
+	Question= 1 << 9, // Message ends with a "?"
+	Sing = 1 << 10, // Message starts with "/s" or "%"
+	
+	//Speech mutations, these should happen before drunk, stutter and that kind of thing!
+	Canadian = 1 << 11,
+	French = 1 << 12,
+	Italian = 1 << 13,
+	Swedish = 1 << 14,
+	Chav = 1 << 15,
+	Smile = 1 << 16,
+	Elvis = 1 << 17,
+	Spurdo = 1 << 18,
+	UwU = 1 << 19,
+	Unintelligible = 1 << 20,
+	Scotsman = 1 << 21
 }
 
 public class ChatEvent
@@ -62,7 +76,7 @@ public class ChatEvent
 	public ChatModifier modifiers = ChatModifier.None;
 	public string speaker;
 	public double timestamp;
-	public Vector2 position;
+	public Vector3 position = TransformState.HiddenPos;
 	public GameObject originator;
 
 	/// <summary>

@@ -23,13 +23,11 @@ public class ItemAttributesV2 : Attributes
 {
 	[SerializeField]
 	[Tooltip("Initial traits of this item on spawn.")]
-	private List<ItemTrait> initialTraits;
+	private List<ItemTrait> initialTraits = null;
 
-	[Tooltip("Size of this item when spawned.")]
+	[Tooltip("Size of this item when spawned. Is none by default, which you should probably change.")]
 	[SerializeField]
-	private ItemSize initialSize;
-
-
+	private ItemSize initialSize = ItemSize.None;
 
 
 	/// <summary>
@@ -51,7 +49,17 @@ public class ItemAttributesV2 : Attributes
 	/// </summary>
 	public float ServerHitDamage
 	{
-		get => hitDamage;
+		get {
+
+			//If item has an ICustomDamageCalculation component, use that instead.
+			ICustomDamageCalculation part = GetComponent<ICustomDamageCalculation>();
+			if (part != null)
+			{
+				return part.ServerPerformDamageCalculation();
+			}
+
+			return hitDamage;
+		}
 		set => hitDamage = value;
 	}
 
@@ -99,6 +107,11 @@ public class ItemAttributesV2 : Attributes
 	[Tooltip("Sound to be played when we click someone with harm intent")]
 	[SerializeField]
 	private string hitSound = "GenericHit";
+
+
+	[Tooltip("How to play sounds.")]
+	[SerializeField]
+	public SoundItemSettings hitSoundSettings;
 	/// <summary>
 	/// Sound to be played when we click someone with harm intent, tracked server side only
 	/// </summary>
@@ -112,7 +125,7 @@ public class ItemAttributesV2 : Attributes
 	//suits and masks. Probably belong in the Clothing component.
 	[Tooltip("Is this a mask that can connect to a tank?")]
 	[SerializeField]
-	private bool canConnectToTank;
+	private bool canConnectToTank = false;
 	/// <summary>
 	/// Whether this item can connect to a gas tank.
 	/// </summary>
@@ -121,7 +134,7 @@ public class ItemAttributesV2 : Attributes
 
 	[Tooltip("Can this item protect humans against spess?")]
 	[SerializeField]
-	private bool isEVACapable;
+	private bool isEVACapable = false;
 	/// <summary>
 	/// Can this item protect humans against spess?
 	/// </summary>
@@ -279,4 +292,18 @@ public class ItemAttributesV2 : Attributes
 	{
 		itemSprites = newSprites;
 	}
+
+	[ContextMenu("Propagate Palette Changes")]
+	public void PropagatePaletteChanges()
+	{
+		ClothingV2 clothing = GetComponent<ClothingV2>();
+		if (clothing != null) clothing.AssignPaletteToSprites(this.ItemSprites.Palette);
+	}
+}
+
+public enum SoundItemSettings
+{
+	Both = 0,
+	OnlyItem = 1,
+	OnlyObject = 2
 }

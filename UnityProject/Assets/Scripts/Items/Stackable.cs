@@ -29,6 +29,8 @@ public class Stackable : NetworkBehaviour, IServerLifecycle, ICheckedInteractabl
 	/// </summary>
 	public int Amount => amount;
 
+	public int MaxAmount => maxAmount;
+
 	/// <summary>
 	/// amount currently in the stack
 	/// </summary>
@@ -159,6 +161,33 @@ public class Stackable : NetworkBehaviour, IServerLifecycle, ICheckedInteractabl
 		{
 			Despawn.ServerSingle(gameObject);
 		}
+	}
+
+	/// <summary>
+	/// Increments the amount by a specified quantity, does not go above the max.
+	/// Do not perform if max is already reached.
+	/// </summary>
+	/// <param name="increase"></param>
+	[Server]
+	public void ServerIncrease(int increase)
+	{
+		if (amount == maxAmount)
+			return;
+
+		if (increase > maxAmount)
+		{
+			Logger.LogErrorFormat("Increased amount {0} will overfill stack, filled to max",
+				 Category.Inventory, increase);
+		}
+
+		int add = increase;
+		if (amount + increase > maxAmount)
+		{
+			//If increase would push stack above maximum amount, make add equal the difference
+			//to reach max stack.
+			add = increase+amount-maxAmount;
+		}
+		SyncAmount(amount, amount + add);
 	}
 
 	/// <summary>

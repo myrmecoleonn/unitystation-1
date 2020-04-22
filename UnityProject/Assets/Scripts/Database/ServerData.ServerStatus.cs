@@ -39,7 +39,8 @@ namespace DatabaseAPI
         private const string hubUpdate = hubRoot + "/statusupdate?data=";
         private float updateWait = 0f;
         private string publicIP;
-        private TelepathyTransport activeTransport;
+        private TelepathyTransport telepathyTransport;
+        private BoosterTransport boosterTransport = null;
 
         void AttemptConfigLoad()
         {
@@ -48,7 +49,7 @@ namespace DatabaseAPI
 
             if (File.Exists(path))
             {
-                activeTransport = FindObjectOfType<TelepathyTransport>();
+                telepathyTransport = FindObjectOfType<TelepathyTransport>();
                 config = JsonUtility.FromJson<ServerConfig>(File.ReadAllText(path));
                 Instance.StartCoroutine(Instance.SendServerStatus());
             }
@@ -74,7 +75,6 @@ namespace DatabaseAPI
 	        if (string.IsNullOrEmpty(config.HubUser) || string.IsNullOrEmpty(config.HubPass))
 	        {
 		        Logger.Log("Invalid Hub creds found, aborting HUB connection", Category.DatabaseAPI);
-		        config = null;
 		        yield break;
 	        }
 
@@ -112,10 +112,12 @@ namespace DatabaseAPI
                 status.PlayerCount = PlayerList.Instance.ConnectionCount;
             }
             status.ServerIP = publicIP;
-            status.ServerPort = Convert.ToInt32(activeTransport.port);
+            status.ServerPort = GetPort();
             status.WinDownload = config.WinDownload;
             status.OSXDownload = config.OSXDownload;
             status.LinuxDownload = config.LinuxDownload;
+
+            status.fps = (int)FPSMonitor.Instance.Current;
 
             UnityWebRequest r = UnityWebRequest.Get(hubUpdate + UnityWebRequest.EscapeURL(JsonUtility.ToJson(status)) + "&user=" + config.HubUser);
             r.SetRequestHeader("Cookie", hubCookie);
@@ -124,6 +126,22 @@ namespace DatabaseAPI
             {
                 Logger.Log("Failed to update hub with server status" + r.error, Category.DatabaseAPI);
             }
+        }
+
+        private int GetPort()
+        {
+	        int port = (config.ServerPort != 0) ? config.ServerPort : 7777;
+	        if (telepathyTransport != null)
+	        {
+		        return Convert.ToInt32(telepathyTransport.port);
+	        }
+
+	        if (boosterTransport!= null)
+	        {
+		        return Convert.ToInt32(boosterTransport.boosterPort);
+	        }
+
+	        return port;
         }
     }
 
@@ -157,6 +175,7 @@ namespace DatabaseAPI
         public string WinDownload;
         public string OSXDownload;
         public string LinuxDownload;
+        public int fps;
     }
 
     //Read from Streaming Assets/config/config.json on the server
@@ -165,6 +184,7 @@ namespace DatabaseAPI
     {
         public string RconPass;
         public int RconPort;
+        public int ServerPort;
         //CertKey needed in the future for SSL Rcon
         public string certKey;
         public string HubUser;

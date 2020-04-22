@@ -9,34 +9,36 @@ public class GUI_SecurityRecordsEntryPage : NetPage
 	private SecurityRecord record;
 	private GUI_SecurityRecords securityRecordsTab;
 	[SerializeField]
-	private NetLabel nameText;
+	private NetLabel nameText = null;
 	[SerializeField]
-	private NetLabel idText;
+	private NetLabel idText = null;
 	[SerializeField]
-	private NetLabel sexText;
+	private NetLabel sexText = null;
 	[SerializeField]
-	private NetLabel ageText;
+	private NetLabel ageText = null;
 	[SerializeField]
-	private NetLabel speciesText;
+	private NetLabel speciesText = null;
 	[SerializeField]
-	private NetLabel rankText;
+	private NetLabel rankText = null;
 	[SerializeField]
-	private NetLabel fingerprintText;
+	private NetLabel fingerprintText = null;
 	[SerializeField]
 	private EmptyItemList crimesList = null;
 	[SerializeField]
-	private NetLabel statusButtonText;
+	private NetLabel statusButtonText = null;
 	[SerializeField]
-	private NetLabel idNameText;
+	private NetLabel idNameText = null;
 	[SerializeField]
-	private GameObject popupWindow;
+	private GameObject popupWindow = null;
+	[SerializeField]
+	private InputFieldFocus popupWindowEditField = null;
 	private NetLabel currentlyEditingField;
 	private SecurityRecordCrime currentlyEditingCrime;
 
-	public NetSpriteAndColor head;
-	public NetSpriteAndColor torso;
-	public NetSpriteAndColor beard;
-	public NetSpriteAndColor hair;
+	public NetSpriteImage head;
+	public NetSpriteImage torso;
+	public NetSpriteImage beard;
+	public NetSpriteImage hair;
 	public NetColorChanger rightLeg;
 	public NetColorChanger leftLeg;
 	public NetColorChanger rightArm;
@@ -157,9 +159,13 @@ public class GUI_SecurityRecordsEntryPage : NetPage
 	/// 2. Client confirms edit in popup, popup closes locally.
 	/// 3. Server sets fields with values from popup.
 	/// </summary>
-	public void OpenPopup()
+	public void OpenPopup(NetLabel fieldToEdit)
 	{
 		popupWindow.SetActive(true);
+		if (fieldToEdit != null)
+		{
+			popupWindowEditField.text = fieldToEdit.Value;
+		}
 	}
 
 	/// <summary>

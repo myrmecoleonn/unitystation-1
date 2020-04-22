@@ -8,20 +8,20 @@ using UnityEngine.Serialization;
 /// <summary>
 ///     ID card properties
 /// </summary>
-public class IDCard : NetworkBehaviour, IServerInventoryMove, IServerSpawn
+public class IDCard : NetworkBehaviour, IServerInventoryMove, IServerSpawn, IExaminable
 {
 
 	[Tooltip("Sprite to use when the card is a normal card")]
 	[SerializeField]
-	private Sprite standardSprite;
+	private Sprite standardSprite = null;
 
 	[Tooltip("Sprite to use when the card is a captain's card")]
 	[SerializeField]
-	private Sprite captainSprite;
+	private Sprite captainSprite = null;
 
 	[Tooltip("Sprite to use when the card is a command-tier card")]
 	[SerializeField]
-	private Sprite commandSprite;
+	private Sprite commandSprite = null;
 
 	[Tooltip("This is used to place ID cards via map editor and then setting their initial access type")]
 	[FormerlySerializedAs("ManuallyAddedAccess")]
@@ -37,7 +37,7 @@ public class IDCard : NetworkBehaviour, IServerInventoryMove, IServerSpawn
 	[Tooltip("If true, will initialize itself with the correct access list, name, job, etc...based on the" +
 	         " first player whose inventory it is added to. Used for initial loadout.")]
 	[SerializeField]
-	private bool autoInitOnPickup;
+	private bool autoInitOnPickup = false;
 	private bool hasAutoInit;
 
 
@@ -215,12 +215,15 @@ public class IDCard : NetworkBehaviour, IServerInventoryMove, IServerSpawn
 
 	}
 
-	public void OnExamine()
+	// When examine is triggered by the server on a player gameobj (by a shift click from another player)
+	// the target's Equipment component returns ID info based on presence of ID card in "viewable" slot (id and hands).
+	// When ID card itself is examined, it should return full text.
+	public string Examine(Vector3 worldPos)
 	{
-		string message = "";
-		message = "This is " + registeredName + "'s ID card\nThey are the " + JobType + " of the station!";
-		Chat.AddExamineMsgToClient(message);
+		return "This is the ID card of " + registeredName + ", station " + JobType + ".";
 	}
+
+
 
 	/// <summary>
 	/// Checks if this id card has the indicated access.
@@ -309,10 +312,4 @@ public class IDCard : NetworkBehaviour, IServerInventoryMove, IServerSpawn
 	{
 		SyncName(registeredName, newName);
 	}
-
-	public void OnHoverStart()
-	{
-		UIManager.SetToolTip = RegisteredName + (Occupation ? $" ({ Occupation.DisplayName })" : "");
-	}
-
 }

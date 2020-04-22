@@ -12,7 +12,7 @@ using UnityEngine.Serialization;
 ///     handles interaction with objects that can
 ///     be walked into it.
 /// </summary>
-public class PlayerMove : NetworkBehaviour, IRightClickable, IServerSpawn
+public class PlayerMove : NetworkBehaviour, IRightClickable, IServerSpawn, IActionGUI
 {
 	public PlayerScript PlayerScript => playerScript;
 
@@ -70,6 +70,11 @@ public class PlayerMove : NetworkBehaviour, IRightClickable, IServerSpawn
 	//starts true because all players spawn with help intent.
 	private bool isHelpIntentServer = true;
 
+
+	[SerializeField]
+	private ActionData actionData = null;
+	public ActionData ActionData => actionData;
+
 	/// <summary>
 	/// Whether this player meets all the conditions for being swapped with (being the swapee).
 	/// </summary>
@@ -98,12 +103,12 @@ public class PlayerMove : NetworkBehaviour, IRightClickable, IServerSpawn
 				canSwap = isSwappable;
 			}
 			return canSwap
-				   //don't swap with ghosts
-				   && !PlayerScript.IsGhost
-				   //pass through players if we can
-				   && !registerPlayer.IsPassable(isServer)
-				   //can't swap with buckled players, they're strapped down
-				   && !IsBuckled;
+			       //don't swap with ghosts
+			       && !PlayerScript.IsGhost
+			       //pass through players if we can
+			       && !registerPlayer.IsPassable(isServer)
+			       //can't swap with buckled players, they're strapped down
+			       && !IsBuckled;
 		}
 	}
 
@@ -118,9 +123,9 @@ public class PlayerMove : NetworkBehaviour, IRightClickable, IServerSpawn
 
 	[HideInInspector] public PlayerNetworkActions pna;
 
-	[FormerlySerializedAs("speed")] public float RunSpeed = 6;
-	public float WalkSpeed = 3;
-	public float CrawlSpeed = 0.8f;
+	[HideInInspector] [SyncVar(hook = nameof(SyncRunSpeed))] public float RunSpeed;
+	[HideInInspector] [SyncVar(hook = nameof(SyncWalkSpeed))] public float WalkSpeed;
+	[HideInInspector] public float CrawlSpeed;
 
 	/// <summary>
 	/// Player will fall when pushed with such speed
@@ -142,6 +147,9 @@ public class PlayerMove : NetworkBehaviour, IRightClickable, IServerSpawn
 
 		registerPlayer = GetComponent<RegisterPlayer>();
 		pna = gameObject.GetComponent<PlayerNetworkActions>();
+		RunSpeed = 6;
+		WalkSpeed = 3;
+		CrawlSpeed = 0.8f;
 	}
 
 	public override void OnStartClient()
@@ -291,7 +299,7 @@ public class PlayerMove : NetworkBehaviour, IRightClickable, IServerSpawn
 		{
 			// Converting world direction to local direction
 			direction = Vector3Int.RoundToInt(matrixInfo.MatrixMove.FacingOffsetFromInitial.QuaternionInverted *
-											  direction);
+			                                  direction);
 		}
 
 
@@ -332,7 +340,7 @@ public class PlayerMove : NetworkBehaviour, IRightClickable, IServerSpawn
 		if (netid == NetId.Invalid)
 		{
 			Logger.LogError("attempted to buckle to object " + toObject + " which has no NetworkIdentity. Buckle" +
-							" can only be used on objects with a Net ID. Ensure this object has one.",
+			                " can only be used on objects with a Net ID. Ensure this object has one.",
 				Category.Movement);
 			return;
 		}
@@ -444,8 +452,7 @@ public class PlayerMove : NetworkBehaviour, IRightClickable, IServerSpawn
 
 		if (PlayerManager.LocalPlayer == gameObject)
 		{
-			//have to do this with a lambda otherwise the Cmd will not fire
-			UIManager.AlertUI.ToggleAlertBuckled(newBuckledTo != NetId.Empty, () => CmdUnbuckle());
+			UIActionManager.Toggle(this, newBuckledTo != NetId.Empty);
 		}
 
 		buckledObjectNetId = newBuckledTo;
@@ -465,6 +472,46 @@ public class PlayerMove : NetworkBehaviour, IRightClickable, IServerSpawn
 		playerScript?.PlayerSync?.RollbackPrediction();
 	}
 
+	/// <summary>
+	/// Changes the player speed from Server. Values inputted as arguments will OVERRIDE the current speed!
+	/// </summary>
+	/// <param name="run">At what speed should the player run</param>
+	/// <param name="walk">At what speed should the player walk</param>
+	[Server]
+	public void ServerChangeSpeed(float run = 0f, float walk = 0f)
+	{
+		RunSpeed = run < CrawlSpeed ? CrawlSpeed : run;
+		WalkSpeed = walk < CrawlSpeed ? CrawlSpeed : walk;
+	}
+
+	private void SyncRunSpeed(float oldSpeed, float newSpeed)
+	{
+		this.RunSpeed = newSpeed;
+	}
+
+	private void SyncWalkSpeed(float oldSpeed, float newSpeed)
+	{
+		this.WalkSpeed = newSpeed;
+	}
+
+	public void CallActionClient()
+	{
+		if (CanUnBuckleSelf())
+		{
+			CmdUnbuckle();
+		}
+	}
+
+	private bool CanUnBuckleSelf()
+	{
+		PlayerHealth playerHealth = playerScript.playerHealth;
+
+		return !(playerHealth == null ||
+		         playerHealth.ConsciousState == ConsciousState.DEAD ||
+		         playerHealth.ConsciousState == ConsciousState.UNCONSCIOUS ||
+		         playerHealth.ConsciousState == ConsciousState.BARELY_CONSCIOUS);
+	}
+
 	[Server]
 	public void Cuff(HandApply interaction)
 	{
@@ -480,7 +527,7 @@ public class PlayerMove : NetworkBehaviour, IRightClickable, IServerSpawn
 		Inventory.ServerDrop(targetStorage.GetNamedItemSlot(NamedSlot.leftHand));
 		Inventory.ServerDrop(targetStorage.GetNamedItemSlot(NamedSlot.rightHand));
 
-		TargetPlayerUIHandCuffToggle(connectionToClient, true);
+		if(connectionToClient != null) TargetPlayerUIHandCuffToggle(connectionToClient, true);
 	}
 
 	[TargetRpc]
@@ -596,6 +643,8 @@ public class PlayerMove : NetworkBehaviour, IRightClickable, IServerSpawn
 	{
 		SyncCuffed(cuffed, this.cuffed);
 	}
+
+
 }
 
 /// <summary>

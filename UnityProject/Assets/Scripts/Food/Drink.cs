@@ -7,13 +7,9 @@ public class Drink : Edible {
 	private void Start()
 	{
 		//assuming all drinks are spillable on throw
-		GetComponent<ItemAttributesV2>().AddTrait(CommonTraits.Instance.SpillOnThrow);
-	}
-
-	// Use this for initialization
-	public override void TryEat()
-	{
-        isDrink = true;
-        base.TryEat();
+		if (itemAttributes)
+		{
+			itemAttributes.AddTrait(CommonTraits.Instance.SpillOnThrow);
+		}
 	}
 }

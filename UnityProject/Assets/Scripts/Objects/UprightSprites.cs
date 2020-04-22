@@ -1,5 +1,6 @@
 
 using System;
+using System.Linq;
 using UnityEngine;
 
 /// <summary>
@@ -12,6 +13,9 @@ public class UprightSprites : MonoBehaviour, IClientLifecycle, IMatrixRotation
 	[Tooltip("Defines how this object's sprites should behave during a matrix rotation")]
 	public SpriteMatrixRotationBehavior spriteMatrixRotationBehavior =
 		SpriteMatrixRotationBehavior.RotateUprightAtEndOfMatrixRotation;
+
+	[Tooltip("Ignore additional rotation (for example, when object is knocked down)")]
+	public SpriteRenderer[] ignoreExtraRotation = new SpriteRenderer[0];
 
 	/// <summary>
 	/// Client side only! additional rotation to apply to the sprites. Can be used to give the object an appearance
@@ -37,7 +41,7 @@ public class UprightSprites : MonoBehaviour, IClientLifecycle, IMatrixRotation
 	private void Awake()
 	{
 		registerTile = GetComponent<RegisterTile>();
-		spriteRenderers = GetComponentsInChildren<SpriteRenderer>();
+		spriteRenderers = GetComponentsInChildren<SpriteRenderer>().Except(ignoreExtraRotation).ToArray();
 		cnt = GetComponent<CustomNetTransform>();
 		registerTile.OnParentChangeComplete.AddListener(OnAppearOrChangeMatrix);
 		registerTile.OnAppearClient.AddListener(OnAppearOrChangeMatrix);
@@ -62,17 +66,18 @@ public class UprightSprites : MonoBehaviour, IClientLifecycle, IMatrixRotation
 
 	public void OnDespawnClient(ClientDespawnInfo info)
 	{
-		UpdateManager.Instance.Remove(SetSpritesUpright);
+		UpdateManager.Remove(CallbackType.UPDATE, SetSpritesUpright);
 	}
 
 	//makes sure it's removed from update manager at end of round since currently updatemanager is not
 	//reset on round end.
 	private void OnDisable()
 	{
-		if (UpdateManager.Instance)
-		{
-			UpdateManager.Instance.Remove(SetSpritesUpright);
-		}
+		// Make sure we're in play mode if running in editor.
+#if UNITY_EDITOR
+		if (Application.isPlaying)
+#endif
+			UpdateManager.Remove(CallbackType.UPDATE, SetSpritesUpright);
 	}
 
 	private void SetSpritesUpright()
@@ -82,9 +87,17 @@ public class UprightSprites : MonoBehaviour, IClientLifecycle, IMatrixRotation
 		//avoids it suddenly flicking upright when it crosses a matrix or matrix rotates
 		//note only CNTs can have spin rotation
 		if (cnt != null && Quaternion.Angle(transform.localRotation, Quaternion.identity) > 5) return;
-		foreach (SpriteRenderer renderer in spriteRenderers)
+		foreach (var rend in spriteRenderers)
 		{
-			renderer.transform.rotation = ExtraRotation;
+			if (rend == null) continue;
+			rend.transform.rotation = ExtraRotation;
+		}
+
+		foreach (var rend in ignoreExtraRotation)
+		{
+			if (rend == null) continue;
+
+			rend.transform.rotation = Quaternion.identity;
 		}
 	}
 
@@ -97,7 +110,7 @@ public class UprightSprites : MonoBehaviour, IClientLifecycle, IMatrixRotation
 			{
 				if (spriteMatrixRotationBehavior == SpriteMatrixRotationBehavior.RemainUpright)
 				{
-					UpdateManager.Instance.Add(SetSpritesUpright);
+					UpdateManager.Add(CallbackType.UPDATE, SetSpritesUpright);
 				}
 			}
 			else if (rotationInfo.IsEnding)
@@ -105,7 +118,7 @@ public class UprightSprites : MonoBehaviour, IClientLifecycle, IMatrixRotation
 				if (spriteMatrixRotationBehavior == SpriteMatrixRotationBehavior.RemainUpright)
 				{
 					//stop reorienting to face upright
-					UpdateManager.Instance.Remove(SetSpritesUpright);
+					UpdateManager.Remove(CallbackType.UPDATE, SetSpritesUpright);
 				}
 
 				SetSpritesUpright();
@@ -119,12 +132,16 @@ public class UprightSprites : MonoBehaviour, IClientLifecycle, IMatrixRotation
 	}
 	//changes the rendered sprite in editor so its always upright
 #if UNITY_EDITOR
-	private void Update()
+	private void OnValidate()
 	{
+		if (spriteRenderers == null)
+			return;
+
 		if (Application.isEditor && !Application.isPlaying)
 		{
 			foreach (var spriteRenderer in spriteRenderers)
 			{
+				if (spriteRenderer == null) continue;
 				spriteRenderer.transform.rotation = Quaternion.identity;
 			}
 		}

@@ -34,7 +34,7 @@ public class Horn : MonoBehaviour, ICheckedInteractable<HandActivate>, ICheckedI
 	private IEnumerator CritHonk( PositionalHandApply clickData, LivingHealthBehaviour targetHealth )
 	{
 		yield return WaitFor.Seconds( 0.02f );
-		SoundManager.PlayNetworkedAtPos( Sound, gameObject.AssumedWorldPosServer(), -1f, true, true, 20, 5 );
+		SoundManager.PlayNetworkedAtPos( Sound, gameObject.AssumedWorldPosServer(), -1f, true, true, 20, 5, sourceObj: GetHonkSoundObject());
 		targetHealth.ApplyDamageToBodypart( clickData.Performer, CritDamage, AttackType.Energy, DamageType.Brute, BodyPartType.Head );
 	}
 
@@ -53,18 +53,19 @@ public class Horn : MonoBehaviour, ICheckedInteractable<HandActivate>, ICheckedI
 	public void ServerPerformInteraction( PositionalHandApply interaction )
 	{
 		bool inCloseRange = Validations.IsInReach( interaction.TargetVector );
-		var targetHealth = interaction.TargetObject.GetComponent<LivingHealthBehaviour>();
+		var targetObject = interaction.TargetObject;
+		var targetHealth = targetObject != null ? targetObject.GetComponent<LivingHealthBehaviour>() : null;
 		bool isCrit = Random.Range( 0f, 1f ) <= CritChance;
 
 		// honking in someone's face
 		if ( inCloseRange && (targetHealth != null) )
 		{
 			interaction.Performer.GetComponent<WeaponNetworkActions>().RpcMeleeAttackLerp( interaction.TargetVector, gameObject );
-			Chat.AddAttackMsgToChat(interaction.Performer, interaction.TargetObject,BodyPartType.None, gameObject);
+			Chat.AddAttackMsgToChat(interaction.Performer, targetObject,BodyPartType.None, gameObject);
 
 			ClassicHonk();
 
-			if ( isCrit )
+			if ( isCrit && interaction.Intent == Intent.Harm)
 			{
 				StartCoroutine( CritHonk( interaction, targetHealth ) );
 			}
@@ -79,7 +80,7 @@ public class Horn : MonoBehaviour, ICheckedInteractable<HandActivate>, ICheckedI
 
 	private void ClassicHonk()
 	{
-		SoundManager.PlayNetworkedAtPos( Sound, gameObject.AssumedWorldPosServer(), randomPitch, true );
+		SoundManager.PlayNetworkedAtPos( Sound, gameObject.AssumedWorldPosServer(), randomPitch, true, sourceObj: GetHonkSoundObject());
 	}
 
 	/// <summary>
@@ -96,7 +97,19 @@ public class Horn : MonoBehaviour, ICheckedInteractable<HandActivate>, ICheckedI
 	/// </summary>
 	public bool WillInteract( PositionalHandApply interaction, NetworkSide side )
 	{
+		if (interaction.HandObject != gameObject) return false;
 		return Validations.CanApply(interaction.Performer, interaction.TargetObject, side, true, ReachRange.Unlimited, interaction.TargetVector)
 				&& allowUse;
+	}
+
+	/// <summary>
+	/// Is called to find the object where the honk sound is played. 
+	/// </summary>
+	/// <returns>The GameObject where the sound for the Honk should be played.
+	/// If the horn is in an inventory, the container in which it is located is returned. </returns>
+	private GameObject GetHonkSoundObject()
+	{
+		ItemSlot itemslot = gameObject.GetComponent<Pickupable>().ItemSlot;
+		return itemslot != null ? itemslot.ItemStorage.gameObject : gameObject;
 	}
 }

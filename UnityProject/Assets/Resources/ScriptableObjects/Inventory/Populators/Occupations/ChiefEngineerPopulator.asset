@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Entries:
   - NamedSlot: 3
-    Prefab: {fileID: 7106618204054676533, guid: f61a15e56150d45e78d9458034719cbb,
+    Prefab: {fileID: 7106618204054676533, guid: 67eaf03d3dc08490c85f77c1aedf4a15,
       type: 3}
   - NamedSlot: 6
     Prefab: {fileID: 3011710637427380133, guid: 10db9e28e42d145e9bbb1b151ee172de,
@@ -25,5 +25,16 @@ MonoBehaviour:
   - NamedSlot: 12
     Prefab: {fileID: 835768756810601639, guid: e3f1e3ca1346b4530930972e42524982, type: 3}
   - NamedSlot: 1
-    Prefab: {fileID: 1387665324668345695, guid: 371b9c216382844659c05791957b28c8,
+    Prefab: {fileID: 621873909327923035, guid: 1616ac23693dc4adf88af91d3ea84856, type: 3}
+  - NamedSlot: 10
+    Prefab: {fileID: 4188245363048309518, guid: 9ece9b1c0b01fa46ab120b1b423b1739,
       type: 3}
+  - NamedSlot: 11
+    Prefab: {fileID: 6373161644663410599, guid: 7cae22bda0476431ba677333bd759b73,
+      type: 3}
+  skirtVariant: {fileID: 596723499395547786, guid: 452d86fa8caf75b49bd132d9f7c9243e,
+    type: 3}
+  duffelVariant: {fileID: 4188245363048309518, guid: 68342a44b6a5e3049b03779b830ff861,
+    type: 3}
+  satchelVariant: {fileID: 4188245363048309518, guid: 2fb5e994a147d26439d2f22d6a544bf4,
+    type: 3}

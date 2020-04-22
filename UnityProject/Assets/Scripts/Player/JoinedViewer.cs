@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Threading;
-using UnityEngine;
+using System.Net.NetworkInformation;
 using Mirror;
+using Newtonsoft.Json;
 
 /// <summary>
 /// This is the Viewer object for a joined player.
@@ -17,53 +15,47 @@ public class JoinedViewer : NetworkBehaviour
 		base.OnStartLocalPlayer();
 		PlayerManager.SetViewerForControl(this);
 
-		if (!PlayerPrefs.HasKey(PlayerPrefKeys.ClientID))
-		{
-			PlayerPrefs.SetString(PlayerPrefKeys.ClientID, "");
-			PlayerPrefs.Save();
-		}
-
-		Logger.LogFormat("JoinedViewer on this client calling CmdServerSetupPlayer, our clientID: {0} username: {1}",
-			Category.Connections,
-			PlayerPrefs.GetString(PlayerPrefKeys.ClientID), PlayerManager.CurrentCharacterSettings.username);
-
-		CmdServerSetupPlayer(PlayerPrefs.GetString(PlayerPrefKeys.ClientID),
-			PlayerManager.CurrentCharacterSettings.username, DatabaseAPI.ServerData.UserID, GameData.BuildNumber,
+		CmdServerSetupPlayer(GetNetworkInfo(),
+			PlayerManager.CurrentCharacterSettings.Username, DatabaseAPI.ServerData.UserID, GameData.BuildNumber,
 			DatabaseAPI.ServerData.IdToken);
 	}
 
 	[Command]
-	private void CmdServerSetupPlayer(string clientID, string username,
-		string userid, int clientVersion, string token)
+	private void CmdServerSetupPlayer(string unverifiedClientId, string unverifiedUsername,
+		string unverifiedUserid, int unverifiedClientVersion, string unverifiedToken)
 	{
-		ServerSetUpPlayer(clientID, username, userid, clientVersion, token);
+		ServerSetUpPlayer(unverifiedClientId, unverifiedUsername, unverifiedUserid, unverifiedClientVersion, unverifiedToken);
 	}
 
 	[Server]
-	private async void ServerSetUpPlayer(string clientID, string username, string userid, int clientVersion,
-		string token)
+	private async void ServerSetUpPlayer(
+		string unverifiedClientId,
+		string unverifiedUsername,
+		string unverifiedUserid,
+		int unverifiedClientVersion,
+		string unverifiedToken)
 	{
-		Logger.LogFormat("A joinedviewer called CmdServerSetupPlayer on this server, clientID: {0} username: {1}",
+		Logger.LogFormat("A joinedviewer called CmdServerSetupPlayer on this server, Unverified ClientId: {0} Unverified Username: {1}",
 			Category.Connections,
-			clientID, username);
+			unverifiedClientId, unverifiedUsername);
 
 		//Register player to player list (logging code exists in PlayerList so no need for extra logging here)
-		var connPlayer = PlayerList.Instance.AddOrUpdate(new ConnectedPlayer
+		var unverifiedConnPlayer = PlayerList.Instance.AddOrUpdate(new ConnectedPlayer
 		{
 			Connection = connectionToClient,
 			GameObject = gameObject,
-			Username = username,
+			Username = unverifiedUsername,
 			Job = JobType.NULL,
-			ClientId = clientID,
-			UserId = userid
+			ClientId = unverifiedClientId,
+			UserId = unverifiedUserid
 		});
 
-		var isValidPlayer = await PlayerList.Instance.ValidatePlayer(clientID, username,
-			userid, clientVersion, connPlayer, token);
-		if (!isValidPlayer) return;
+		var isValidPlayer = await PlayerList.Instance.ValidatePlayer(unverifiedClientId, unverifiedUsername,
+			unverifiedUserid, unverifiedClientVersion, unverifiedConnPlayer, unverifiedToken);
+		if (!isValidPlayer) return; //this validates Userid and Token
 
 		// Check if they have a player to rejoin. If not, assign them a new client ID
-		var loggedOffPlayer = PlayerList.Instance.TakeLoggedOffPlayer(clientID);
+		var loggedOffPlayer = PlayerList.Instance.TakeLoggedOffPlayerbyClientId(unverifiedClientId);
 
 		if (loggedOffPlayer != null)
 		{
@@ -75,28 +67,19 @@ public class JoinedViewer : NetworkBehaviour
 			}
 		}
 
-		if (loggedOffPlayer == null)
-		{
-			//This is the players first time connecting to this round, assign them a Client ID;
-			var oldID = clientID;
-			clientID = Guid.NewGuid().ToString();
-			connPlayer.ClientId = clientID;
-			Logger.LogFormat("This server did not find a logged off player with clientID {0}, assigning" +
-			                 " joined viewer a new ID {1}", Category.Connections, oldID, clientID);
-		}
-
 		// Sync all player data and the connected player count
 		CustomNetworkManager.Instance.SyncPlayerData(gameObject);
 		UpdateConnectedPlayersMessage.Send();
-
 
 		// Only sync the pre-round countdown if it's already started
 		if (GameManager.Instance.CurrentRoundState == RoundState.PreRound)
 		{
 			if (GameManager.Instance.waitForStart)
 			{
-				TargetSyncCountdown(connectionToClient, GameManager.Instance.waitForStart,
-					GameManager.Instance.startTime);
+				// Calculate when the countdown will end in the unix timestamp
+				long endTime = DateTimeOffset.UtcNow.AddSeconds(GameManager.Instance.CountdownTime)
+					.ToUnixTimeMilliseconds();
+				TargetSyncCountdown(connectionToClient, GameManager.Instance.waitForStart, endTime);
 			}
 			else
 			{
@@ -112,11 +95,11 @@ public class JoinedViewer : NetworkBehaviour
 		}
 		else
 		{
-			TargetLocalPlayerSetupNewPlayer(connectionToClient, connPlayer.ClientId,
+			TargetLocalPlayerSetupNewPlayer(connectionToClient,
 				GameManager.Instance.CurrentRoundState);
 		}
 
-		PlayerList.Instance.CheckAdminState(connPlayer, userid);
+		PlayerList.Instance.CheckAdminState(unverifiedConnPlayer, unverifiedUserid);
 	}
 
 	/// <summary>
@@ -127,16 +110,8 @@ public class JoinedViewer : NetworkBehaviour
 	/// <param name="serverClientID">client ID server</param>
 	/// <param name="roundState"></param>
 	[TargetRpc]
-	private void TargetLocalPlayerSetupNewPlayer(NetworkConnection target,
-		string serverClientID, RoundState roundState)
+	private void TargetLocalPlayerSetupNewPlayer(NetworkConnection target, RoundState roundState)
 	{
-		Logger.LogFormat("JoinedViewer on this client updating our client id to what server tells us, from {0} to {1}",
-			Category.Connections,
-			PlayerPrefs.GetString(PlayerPrefKeys.ClientID), serverClientID);
-		//save our ID so we can rejoin
-		PlayerPrefs.SetString(PlayerPrefKeys.ClientID, serverClientID);
-		PlayerPrefs.Save();
-
 		//clear our UI because we're about to change it based on the round state
 		UIManager.ResetAllUI();
 
@@ -147,38 +122,104 @@ public class JoinedViewer : NetworkBehaviour
 				// Round hasn't yet started, give players the pre-game screen
 				UIManager.Display.SetScreenForPreRound();
 				break;
-			// case RoundState.Started:
-			// TODO spawn a ghost if round has already ended?
 			default:
-				// occupation select
-				UIManager.Display.SetScreenForJobSelect();
+				// Show the joining screen
+				UIManager.Display.SetScreenForJoining();
 				break;
 		}
 	}
 
+	public void RequestJob(JobType job)
+	{
+		var jsonCharSettings = JsonConvert.SerializeObject(PlayerManager.CurrentCharacterSettings);
+		CmdRequestJob(job, jsonCharSettings);
+	}
+
 	/// <summary>
-	/// At the moment players can choose their jobs on round start:
+	/// Used for requesting a job at round start.
+	/// Assigns the occupation to the player and spawns them on the station.
+	/// Fails if no more slots for that occupation are available.
 	/// </summary>
 	[Command]
-	public void CmdRequestJob(JobType jobType, CharacterSettings characterSettings)
+	private void CmdRequestJob(JobType jobType, string jsonCharSettings)
 	{
+		var characterSettings = JsonConvert.DeserializeObject<CharacterSettings>(jsonCharSettings);
+		if (GameManager.Instance.CurrentRoundState != RoundState.Started)
+		{
+			Logger.LogWarningFormat("Round hasn't started yet, can't request job {0} for {1}", Category.Jobs, jobType, characterSettings);
+			return;
+		}
+		int slotsTaken = GameManager.Instance.GetOccupationsCount(jobType);
+		int slotsMax = GameManager.Instance.GetOccupationMaxCount(jobType);
+		if (slotsTaken >= slotsMax)
+		{
+			return;
+		}
+
 		var spawnRequest =
 			PlayerSpawnRequest.RequestOccupation(this, GameManager.Instance.GetRandomFreeOccupation(jobType), characterSettings);
 		//regardless of their chosen occupation, they might spawn as an antag instead.
 		//If they do, bypass the normal spawn logic.
 		if (GameManager.Instance.TrySpawnAntag(spawnRequest)) return;
 
-		PlayerSpawn.ServerSpawnPlayer(spawnRequest.JoinedViewer, spawnRequest.RequestedOccupation, characterSettings);
+		PlayerSpawn.ServerSpawnPlayer(spawnRequest);
+	}
+	/// <summary>
+	/// Command to spectate a round instead of spawning as a player
+	/// </summary>
+	[Command]
+	public void CmdSpectate()
+	{
+		PlayerSpawn.ServerSpawnGhost(this);
 	}
 
 	/// <summary>
 	/// Tells the client to start the countdown if it's already started
 	/// </summary>
 	[TargetRpc]
-	private void TargetSyncCountdown(NetworkConnection target, bool started, float countdownTime)
+	private void TargetSyncCountdown(NetworkConnection target, bool started, long endTime)
 	{
 		Logger.Log("Syncing countdown!", Category.Round);
-		UIManager.Instance.displayControl.preRoundWindow.GetComponent<GUI_PreRoundWindow>()
-			.SyncCountdown(started, countdownTime);
+		UIManager.Display.preRoundWindow.GetComponent<GUI_PreRoundWindow>().SyncCountdown(started, endTime);
+	}
+
+	private string GetNetworkInfo()
+	{
+		var nics = NetworkInterface.GetAllNetworkInterfaces();
+		foreach (var n in nics)
+		{
+			if (!string.IsNullOrEmpty(n.GetPhysicalAddress().ToString()))
+			{
+				return n.GetPhysicalAddress().ToString();
+			}
+		}
+
+		return "";
+	}
+
+	/// <summary>
+	/// Mark this joined viewer as ready for job allocation
+	/// </summary>
+	public void SetReady(bool isReady)
+	{
+		var jsonCharSettings = "";
+		if (isReady)
+		{
+			jsonCharSettings = JsonConvert.SerializeObject(PlayerManager.CurrentCharacterSettings);
+		}
+		CmdPlayerReady(isReady, jsonCharSettings);
+	}
+
+	[Command]
+	private void CmdPlayerReady(bool isReady, string jsonCharSettings)
+	{
+		var player = PlayerList.Instance.GetByConnection(connectionToClient);
+
+		CharacterSettings charSettings = null;
+		if (isReady)
+		{
+			charSettings = JsonConvert.DeserializeObject<CharacterSettings>(jsonCharSettings);
+		}
+		PlayerList.Instance.SetPlayerReady(player, isReady, charSettings);
 	}
 }

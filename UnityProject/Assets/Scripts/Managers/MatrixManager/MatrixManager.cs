@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Chemistry;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -13,7 +14,8 @@ public enum CollisionType
 {
 	None = -1,
 	Player = 0,
-	Shuttle = 1
+	Shuttle = 1,
+	Airborne = 2
 };
 
 /// Matrix manager keeps a list of matrices that you can access from both client and server.
@@ -44,7 +46,7 @@ public partial class MatrixManager : MonoBehaviour
 
 	[SerializeField]
 	[Header("Set main station matrix here")]
-	private Matrix mainStationMatrix;
+	private Matrix mainStationMatrix = null;
 
 	public static MatrixInfo MainStationMatrix => Get(Instance.mainStationMatrix);
 
@@ -293,7 +295,7 @@ public partial class MatrixManager : MonoBehaviour
 	/// Picks best matching matrix at provided coords and releases reagents to that tile.
 	/// <inheritdoc cref="MetaDataLayer.ReagentReact"/>
 	/// </summary>
-	public static void ReagentReact(Dictionary<string, float> reagents, Vector3Int worldPos)
+	public static void ReagentReact(ReagentMix reagents, Vector3Int worldPos)
 	{
 		if (!CustomNetworkManager.IsServer) return;
 

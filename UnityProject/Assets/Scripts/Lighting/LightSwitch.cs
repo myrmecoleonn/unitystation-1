@@ -9,7 +9,6 @@ using System;
 /// Automatically determines what lights it is hooked up to based on its facing direction (set in Directional)
 /// on startup and sets their RelatedAPC to this light switch's related apc.
 /// </summary>
-[ExecuteInEditMode]
 [RequireComponent(typeof(Directional))]
 public class LightSwitch : NetworkBehaviour, IClientInteractable<HandApply>
 {
@@ -48,65 +47,37 @@ public class LightSwitch : NetworkBehaviour, IClientInteractable<HandApply>
 
 	private Directional directional;
 
-	private void Awake()
+	private void EnsureInit()
 	{
-		if (!Application.isPlaying)
+		if (this == null || directional != null)
 		{
 			return;
 		}
-
-		EnsureInit();
-
-	}
-
-	private void EnsureInit()
-	{
-		if (directional != null) return;
-
-		this.directional = GetComponent<Directional>();
+		directional = GetComponent<Directional>();
 		registerTile = GetComponent<RegisterTile>();
 		spriteRenderer = GetComponentInChildren<SpriteRenderer>();
 		clickSFX = GetComponent<AudioSource>();
 	}
 
-	void Update()
-	{
-		if (!Application.isPlaying)
-		{
-			if (!SelfPowered && RelatedAPC == null)
-			{
-				Logger.LogError("Lightswitch is missing APC reference, at " + transform.position, Category.Electrical);
-				RelatedAPC.Current = 1; //so It will bring up an error, you can go to click on to go to the actual object with the missing reference
-			}
-			return;
-		}
-	}
-
-
-
 	private void Start()
 	{
-		if (!Application.isPlaying)
-		{
-			return;
-		}
 		//This is needed because you can no longer apply lightSwitch prefabs (it will move all of the child sprite positions)
 		gameObject.layer = LayerMask.NameToLayer("WallMounts");
 		//and the rest of the mask caches:
 		lightingMask = LayerMask.GetMask("Lighting");
 		obstacleMask = LayerMask.GetMask("Walls", "Door Open", "Door Closed");
-		WaitForLoad();
+		EnsureInit();
 		if(!SelfPowered) DetectAPC();
 		DetectLightsAndAction(true);
 		if (RelatedAPC != null)
 		{
-			RelatedAPC.ConnectedSwitchesAndLights[this] = new List<LightSource>();
+			//RelatedAPC.ConnectedSwitchesAndLights[this] = new List<LightSource>();
 		}
 		if (SelfPowered)
 		{
 			for (int i = 0; i < SelfPowerLights.Count; i++)
 			{
-				SelfPowerLights[i].PowerLightIntensityUpdate(240);
+				//SelfPowerLights[i].PowerLightIntensityUpdate(240);
 			}
 		}
 	}
@@ -131,15 +102,9 @@ public class LightSwitch : NetworkBehaviour, IClientInteractable<HandApply>
 	}
 	public override void OnStartClient()
 	{
+		base.OnStartClient();
 		EnsureInit();
 		SyncLightSwitch(isOn, this.isOn);
-		StartCoroutine(WaitForLoad());
-	}
-
-	private IEnumerator WaitForLoad()
-	{
-		yield return WaitFor.Seconds(3f);
-		SyncLightSwitch(isOn, isOn);
 	}
 
 	public bool Interact(HandApply interaction)
@@ -223,16 +188,22 @@ public class LightSwitch : NetworkBehaviour, IClientInteractable<HandApply>
 		{
 			if (SelfPowered)
 			{
-				foreach (var l in SelfPowerLights)
+				foreach (var lightSource in SelfPowerLights)
 				{
-					LightSwitchData Send = new LightSwitchData() { state = state, LightSwitch = this, RelatedAPC = RelatedAPC };
-					l.gameObject.SendMessage("Received", Send, SendMessageOptions.DontRequireReceiver);
+					LightSwitchData Send = new LightSwitchData()
+						{state = state, LightSwitch = this, RelatedAPC = RelatedAPC};
+					lightSource.gameObject.SendMessage("Received", Send, SendMessageOptions.DontRequireReceiver);
 				}
 			}
 
 			return;
 		}
 
+		DetectLights(state);
+	}
+
+	private void DetectLights(bool state)
+	{
 		Vector2 startPos = GetCastPos();
 		//figure out which lights this switch is hooked up to based on proximity and facing
 		int length = Physics2D.OverlapCircleNonAlloc(startPos, radius, lightSpriteColliders, lightingMask);
@@ -246,12 +217,23 @@ public class LightSwitch : NetworkBehaviour, IClientInteractable<HandApply>
 			{
 				if (localObject.tag != "EmergencyLight")
 				{
-					LightSwitchData Send = new LightSwitchData() { state = state, LightSwitch = this, RelatedAPC = RelatedAPC };
+					var Send = new LightSwitchData()
+						{
+							state = state,
+							LightSwitch = this,
+							RelatedAPC = RelatedAPC
+						};
 					localObject.SendMessage("Received", Send, SendMessageOptions.DontRequireReceiver);
 				}
+
 				if (RelatedAPC != null) //|| SelfPowered
 				{
-					LightSwitchData Send = new LightSwitchData() { LightSwitch = this, RelatedAPC = RelatedAPC, SelfPowered = SelfPowered };
+					var Send = new LightSwitchData()
+						{
+							LightSwitch = this,
+							RelatedAPC = RelatedAPC,
+							SelfPowered = SelfPowered
+						};
 					localObject.SendMessage("EmergencyLight", Send, SendMessageOptions.DontRequireReceiver);
 				}
 			}

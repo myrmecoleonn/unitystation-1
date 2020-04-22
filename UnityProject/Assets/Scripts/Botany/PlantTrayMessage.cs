@@ -4,9 +4,9 @@ using UnityEngine;
 /// <summary>
 /// Used to synchronise all the sprites of the PlantTray
 /// </summary>
-public class PlantTrayMessage : ServerMessage
+/*public class PlantTrayMessage : ServerMessage
 {
-	public static short MessageType = (short) MessageTypes.PlantTrayMessage;
+	public override short MessageType => (short) MessageTypes.PlantTrayMessage;
 	public string PlantSyncString;
 	public int GrowingPlantStage;
 	public PlantSpriteStage PlantSyncStage;
@@ -17,7 +17,7 @@ public class PlantTrayMessage : ServerMessage
 
 	public uint Tray;
 
-	public override IEnumerator Process()
+	public override void Process()
 	{
 		yield return WaitFor(Tray);
 
@@ -47,7 +47,7 @@ public class PlantTrayMessage : ServerMessage
 			SyncWaterNotifier = waterNotifier,
 			SyncWeedNotifier = weedNotifier
 		};
-		msg.SendToNearbyPlayers(tray.transform.position);
+		msg.SendToAll();
 		return msg;
 	}
-}
+}*/

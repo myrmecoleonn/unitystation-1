@@ -46,15 +46,14 @@ public class EncryptionKey : NetworkBehaviour
 		{EncryptionKeyType.HeadOfSecurity, ChatChannel.Common | ChatChannel.Security | ChatChannel.Command},
 		{EncryptionKeyType.ResearchDirector, ChatChannel.Common | ChatChannel.Science | ChatChannel.Command},
 		{EncryptionKeyType.Supply, ChatChannel.Common | ChatChannel.Supply},
-		{EncryptionKeyType.QuarterMaster, ChatChannel.Common | ChatChannel.Supply | ChatChannel.Command},
+		{EncryptionKeyType.QuarterMaster, ChatChannel.Common | ChatChannel.Supply},
 		{EncryptionKeyType.CentComm, ChatChannel.Common | ChatChannel.CentComm},
 		{EncryptionKeyType.Engineering, ChatChannel.Common | ChatChannel.Engineering},
 		{EncryptionKeyType.Medical, ChatChannel.Common | ChatChannel.Medical},
 		{EncryptionKeyType.Science, ChatChannel.Common | ChatChannel.Science},
 		{EncryptionKeyType.Security, ChatChannel.Common | ChatChannel.Security},
 		{EncryptionKeyType.Service, ChatChannel.Common | ChatChannel.Service},
-		{EncryptionKeyType.Syndicate, ChatChannel.Common | ChatChannel.Syndicate | ChatChannel.Command | ChatChannel.Security |
-		                              ChatChannel.Engineering | ChatChannel.Supply | ChatChannel.Service | ChatChannel.Medical | ChatChannel.Science},
+		{EncryptionKeyType.Syndicate, ChatChannel.Syndicate },
 		{EncryptionKeyType.Mining, ChatChannel.Common | ChatChannel.Supply | ChatChannel.Science},
 		{EncryptionKeyType.Genetics, ChatChannel.Common | ChatChannel.Medical | ChatChannel.Science}
 	};
@@ -197,7 +196,7 @@ public class EncryptionKey : NetworkBehaviour
 /// Downside – all players will get that info (same with syncvars)
 	public override bool OnSerialize(NetworkWriter writer, bool initialState)
 	{
-		writer.Write(type.ToString());
+		writer.WriteString(type.ToString());
 		return base.OnSerialize(writer, initialState);
 	}
 	public override void OnDeserialize(NetworkReader reader, bool initialState)
@@ -273,7 +272,7 @@ public class EncryptionKey : NetworkBehaviour
 
 	#endregion
 
-	public void OnExamine()
+	public void onExamine(Vector3 worldPos)
 	{
 		Chat.AddExamineMsgToClient(ExamineTexts[Type]);
 	}

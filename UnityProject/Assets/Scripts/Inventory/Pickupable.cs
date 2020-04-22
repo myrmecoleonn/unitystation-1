@@ -14,6 +14,7 @@ public class Pickupable : NetworkBehaviour, IPredictedCheckedInteractable<HandAp
 	IRightClickable, IServerDespawn, IServerInventoryMove
 {
 	private CustomNetTransform customNetTransform;
+	public CustomNetTransform CustomNetTransform => customNetTransform;
 	private ObjectBehaviour objectBehaviour;
 	private RegisterTile registerTile;
 
@@ -78,6 +79,9 @@ public class Pickupable : NetworkBehaviour, IPredictedCheckedInteractable<HandAp
 			//clear previous slot appearance
 			PlayerAppearanceMessage.SendToAll(info.FromPlayer.gameObject,
 				(int)info.FromSlot.NamedSlot.GetValueOrDefault(NamedSlot.none), null);
+
+			//ask target playerscript to update shown name.
+			info.FromPlayer.GetComponent<PlayerScript>().RefreshVisibleName();
 		}
 
 		if (info.ToPlayer != null &&
@@ -86,6 +90,9 @@ public class Pickupable : NetworkBehaviour, IPredictedCheckedInteractable<HandAp
 			//change appearance based on new item
 			PlayerAppearanceMessage.SendToAll(info.ToPlayer.gameObject,
 				(int)info.ToSlot.NamedSlot.GetValueOrDefault(NamedSlot.none), info.MovedObject.gameObject);
+
+			//ask target playerscript to update shown name.
+			info.ToPlayer.GetComponent<PlayerScript>().RefreshVisibleName();
 		}
 	}
 
@@ -117,7 +124,7 @@ public class Pickupable : NetworkBehaviour, IPredictedCheckedInteractable<HandAp
 		//hand needs to be empty for pickup
 		if (interaction.HandObject != null) return false;
 		//instead of the base logic, we need to use extended range check for CanApply
-		if (!Validations.CanApply(interaction, side, true, ReachRange.Standard)) return false;
+		if (!Validations.CanApply(interaction, side, true, ReachRange.Standard, isPlayerClick: true)) return false;
 
 		return true;
 	}
@@ -184,15 +191,14 @@ public class Pickupable : NetworkBehaviour, IPredictedCheckedInteractable<HandAp
 
 	public RightClickableResult GenerateRightClickOptions()
 	{
-		//would the interaction validate locally?
-		var valid = WillInteract(HandApply.ByLocalPlayer(gameObject), NetworkSide.Client);
-		if (valid)
-		{
-			return RightClickableResult.Create()
-				.AddElement("PickUp", RightClickInteract);
-		}
+		if (!canPickup) return null;
+		var interaction = HandApply.ByLocalPlayer(gameObject);
+		if (interaction.TargetObject != gameObject) return null;
+		if (interaction.HandObject != null) return null;
+		if (!Validations.CanApply(interaction, NetworkSide.Client, true, ReachRange.Standard, isPlayerClick: false)) return null;
 
-		return null;
+		return RightClickableResult.Create()
+				.AddElement("PickUp", RightClickInteract);
 	}
 
 	private void RightClickInteract()
@@ -281,6 +287,17 @@ public class Pickupable : NetworkBehaviour, IPredictedCheckedInteractable<HandAp
 			if (equipment == null) return;
 			var CT = equipment.GetClothingItem(itemSlot.NamedSlot.Value);
 			CT.SetInHand(_ItemsSprites);
+		}
+	}
+
+	public void SetPalette(List<Color> palette)
+	{
+		if (itemSlot != null)
+		{
+			var equipment = itemSlot.Player.GetComponent<Equipment>();
+			if (equipment == null) return;
+			var CT = equipment.GetClothingItem(itemSlot.NamedSlot.Value);
+			CT.spriteHandler.SetPaletteOfCurrentSprite(palette);
 		}
 	}
 }

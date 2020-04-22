@@ -9,6 +9,8 @@
 		private SubsystemManager subsystemManager;
 		private SubsystemManager SubsystemManager => subsystemManager ? subsystemManager : subsystemManager = GetComponentInParent<SubsystemManager>();
 
+		private TileChangeManager tileChangeManager;
+
 		public bool OneDirectionRestricted;
 
 		[SerializeField]
@@ -36,6 +38,7 @@
 			GetComponent<Integrity>().OnWillDestroyServer.AddListener(OnWillDestroyServer);
 			//Doors/airlocks aren't supposed to switch matrices
 			GetComponent<CustomNetTransform>().IsFixedMatrix = true;
+			tileChangeManager = GetComponentInParent<TileChangeManager>();
 		}
 
 		public override void OnDespawnServer(DespawnInfo info)
@@ -43,6 +46,7 @@
 			base.OnDespawnServer(info);
 			//when we're going to be destroyed, need to tell all subsystems that our space is now passable
 			isClosed = false;
+			tileChangeManager.RemoveTile(LocalPositionServer, LayerType.Walls); //for false-wall meta-walls
 			if (SubsystemManager != null)
 			{
 				SubsystemManager.UpdateAt(LocalPositionServer);
@@ -65,7 +69,9 @@
 				Vector3Int v = Vector3Int.RoundToInt(transform.localRotation * Vector3.down);
 
 				// Returns false if player is bumping door from the restricted direction
-				return !(to - (isServer ? LocalPositionServer : LocalPositionClient)).y.Equals(v.y);
+				var position = isServer? LocalPositionServer : LocalPositionClient;
+				var direction = to - position;
+				return !direction.y.Equals(v.y) || !direction.x.Equals(v.x);
 			}
 
 			return !isClosed;
@@ -90,7 +96,9 @@
 				Vector3Int v = Vector3Int.RoundToInt(transform.localRotation * Vector3.down);
 
 				// Returns false if player is bumping door from the restricted direction
-				return !(from - (isServer ? LocalPositionServer : LocalPositionClient)).y.Equals(v.y);
+				var position = isServer? LocalPositionServer : LocalPositionClient;
+				var direction = from - position;
+				return !direction.y.Equals(v.y) || !direction.x.Equals(v.x);
 			}
 
 			return !isClosed;

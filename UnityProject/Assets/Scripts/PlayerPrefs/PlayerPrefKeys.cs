@@ -29,6 +29,12 @@
 	public static string AmbientVolumeKey = "AmbientVol";
 
 	/// <summary>
+	/// Master Volume level
+	/// 0 - 1f
+	/// </summary>
+	public static string MasterVolumeKey = "MasterVol";
+
+	/// <summary>
 	/// TTS Toggle Pref.
 	/// 0 = disabled
 	/// 1 = enabled
@@ -41,19 +47,11 @@
 	public static string ChatBubbleThemeKey = "ChatBubbleTheme";
 
 	/// <summary>
-	/// ClientID is a unique identifier that allows a player to reclaim
-	/// their body on a reconnect. An id is given to each client so that
-	/// we are not relying on SteamID as the identifier.
-	/// </summary>
-	public static string ClientID = "ClientID";
-
-	/// <summary>
 	/// MuteMusic toggle
 	/// 0 = disabled
 	/// 1 = enabled
 	/// </summary>
 	public static string MuteMusic = "MuteMusic";
-
 
 	/// <summary>
 	/// Whether or not to show highlights on items
@@ -65,4 +63,8 @@
 	/// Sets the client side target frame rate preference
 	/// </summary>
 	public static string TargetFrameRate = "TargetFrameRate";
+	/// <summary>
+	/// Sets the normal chat bubble size preference
+	/// </summary>
+	public static string ChatBubbleSize = "ChatBubbleSize";
 }

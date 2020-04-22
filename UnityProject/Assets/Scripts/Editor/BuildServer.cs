@@ -10,10 +10,14 @@ using UnityEditor.Build.Reporting;
 
 static class BuildScript
 {
+	[Obsolete]
 	private static void PerformServerBuild()
 	{
 		BuildPlayerOptions buildPlayerOptions = new BuildPlayerOptions();
-		buildPlayerOptions.scenes = new[] {"Assets/scenes/StartUp.unity","Assets/scenes/Lobby.unity", "Assets/scenes/OutpostStation.unity"};
+		buildPlayerOptions.scenes = new[] {"Assets/scenes/StartUp.unity","Assets/scenes/Lobby.unity",
+			"Assets/scenes/BoxStationV1.unity", "Assets/scenes/OutpostStation.unity",
+			"Assets/scenes/PogStation.unity", "Assets/scenes/AsteroidStation.unity"
+		};
 		buildPlayerOptions.locationPathName = "../Tools/ContentBuilder/content/Server/Unitystation-Server";
 		buildPlayerOptions.target = BuildTarget.StandaloneLinux64;
 		buildPlayerOptions.options = BuildOptions.Development;
@@ -22,10 +26,10 @@ static class BuildScript
 	}
 
 	//IMPORTANT: ALWAYS DO WINDOWS BUILD FIRST IN YOUR BUILD CYCLE:
+	[Obsolete]
 	private static void PerformWindowsBuild()
 	{
 		//Always build windows client first so that build info can increment the build number
-		int buildNum = 0;
 		var buildInfo = JsonUtility.FromJson<BuildInfo>(File.ReadAllText(Path.Combine(Application.streamingAssetsPath, "buildinfo.json")));
 		BuildInfo buildInfoUpdate = new BuildInfo();
 		if (File.Exists(Path.Combine(Application.streamingAssetsPath, "buildinfoupdate.json")))
@@ -50,27 +54,40 @@ static class BuildScript
 		File.WriteAllText(Path.Combine(Application.streamingAssetsPath, "buildinfoupdate.json"), JsonUtility.ToJson(buildInfoUpdate));
 
 		BuildPlayerOptions buildPlayerOptions = new BuildPlayerOptions();
-		buildPlayerOptions.scenes = new[] {"Assets/scenes/StartUp.unity","Assets/scenes/Lobby.unity", "Assets/scenes/OutpostStation.unity"};
+		buildPlayerOptions.scenes = new[] {"Assets/scenes/StartUp.unity","Assets/scenes/Lobby.unity",
+			"Assets/scenes/BoxStationV1.unity", "Assets/scenes/OutpostStation.unity",
+			"Assets/scenes/PogStation.unity", "Assets/scenes/AsteroidStation.unity"
+		};
 		buildPlayerOptions.locationPathName = "../Tools/ContentBuilder/content/Windows/Unitystation.exe";
 		buildPlayerOptions.target = BuildTarget.StandaloneWindows64;
 		buildPlayerOptions.options = BuildOptions.CompressWithLz4HC;
 		BuildPreferences.SetRelease(true);
 		BuildPipeline.BuildPlayer(buildPlayerOptions);
 	}
+
+	[Obsolete]
 	private static void PerformOSXBuild()
 	{
 		BuildPlayerOptions buildPlayerOptions = new BuildPlayerOptions();
-		buildPlayerOptions.scenes = new[] {"Assets/scenes/StartUp.unity","Assets/scenes/Lobby.unity", "Assets/scenes/OutpostStation.unity"};
+		buildPlayerOptions.scenes = new[] {"Assets/scenes/StartUp.unity","Assets/scenes/Lobby.unity",
+			"Assets/scenes/BoxStationV1.unity", "Assets/scenes/OutpostStation.unity",
+			"Assets/scenes/PogStation.unity", "Assets/scenes/AsteroidStation.unity"
+		};
 		buildPlayerOptions.locationPathName = "../Tools/ContentBuilder/content/OSX/Unitystation.app";
 		buildPlayerOptions.target = BuildTarget.StandaloneOSX;
 		buildPlayerOptions.options = BuildOptions.CompressWithLz4HC;
 		BuildPreferences.SetRelease(true);
 		BuildPipeline.BuildPlayer(buildPlayerOptions);
 	}
+
+	[Obsolete]
 	private static void PerformLinuxBuild()
 	{
 		BuildPlayerOptions buildPlayerOptions = new BuildPlayerOptions();
-		buildPlayerOptions.scenes = new[] {"Assets/scenes/StartUp.unity","Assets/scenes/Lobby.unity", "Assets/scenes/OutpostStation.unity"};
+		buildPlayerOptions.scenes = new[] {"Assets/scenes/StartUp.unity","Assets/scenes/Lobby.unity",
+			"Assets/scenes/BoxStationV1.unity", "Assets/scenes/OutpostStation.unity",
+			"Assets/scenes/PogStation.unity", "Assets/scenes/AsteroidStation.unity"
+		};
 		buildPlayerOptions.locationPathName = "../Tools/ContentBuilder/content/Linux/Unitystation";
 		buildPlayerOptions.target = BuildTarget.StandaloneLinux64;
 		buildPlayerOptions.options = BuildOptions.CompressWithLz4HC;
@@ -181,7 +198,14 @@ static class BuildScript
 			scenes = scenes,
 			locationPathName = locationPathName,
 			target = target,
+			options = BuildOptions.CompressWithLz4HC
 		};
+
+		if (target == BuildTarget.StandaloneLinux64)
+		{
+			buildOptions.options = BuildOptions.Development;
+		}
+
 		ReportOptions(buildOptions);
 
 		// Perform build

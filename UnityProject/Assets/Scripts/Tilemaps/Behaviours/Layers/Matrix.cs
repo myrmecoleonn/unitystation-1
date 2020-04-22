@@ -1,16 +1,16 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Light2D;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.Tilemaps;
-
 /// <summary>
 /// Behavior which indicates a matrix - a contiguous grid of tiles.
 ///
 /// If a matrix can move / rotate, the parent gameobject will have a MatrixMove component. Not this gameobject.
 /// </summary>
-public class Matrix : MonoBehaviour
+public class  Matrix : MonoBehaviour
 {
 	private MetaTileMap metaTileMap;
 	private MetaTileMap MetaTileMap => metaTileMap ? metaTileMap : metaTileMap = GetComponent<MetaTileMap>();
@@ -26,7 +26,14 @@ public class Matrix : MonoBehaviour
 	public MetaDataLayer MetaDataLayer => metaDataLayer;
 	private MetaDataLayer metaDataLayer;
 
+	public UnderFloorLayer UnderFloorLayer => underFloorLayer;
+	private UnderFloorLayer underFloorLayer;
+
+
 	public MatrixMove MatrixMove { get; private set; }
+
+	private TileChangeManager tileChangeManager;
+	public TileChangeManager TileChangeManager => tileChangeManager;
 
 	public Color Color => colors.Wrap( Id ).WithAlpha( 0.7f );
 
@@ -40,14 +47,14 @@ public class Matrix : MonoBehaviour
 	/// Should make people fall and shake items a bit
 	/// </summary>
 	public EarthquakeEvent OnEarthquake = new EarthquakeEvent();
-
 	private void Awake()
 	{
 		initialOffset = Vector3Int.CeilToInt(gameObject.transform.position);
 		reactionManager = GetComponent<ReactionManager>();
 		metaDataLayer = GetComponent<MetaDataLayer>();
 		MatrixMove = GetComponentInParent<MatrixMove>();
-
+		tileChangeManager = GetComponentInParent<TileChangeManager>();
+		underFloorLayer = GetComponentInChildren<UnderFloorLayer>();
 
 		OnEarthquake.AddListener( ( worldPos, magnitude ) =>
 		{
@@ -84,9 +91,9 @@ public class Matrix : MonoBehaviour
 		}
 	}
 
-	public bool IsPassableAt(Vector3Int position, bool isServer, bool includingPlayers = true)
+	public bool IsPassableAt(Vector3Int position, bool isServer, bool includingPlayers = true, List<LayerType> excludeLayers = null, List<TileType> excludeTiles = null)
 	{
-		return IsPassableAt(position, position, isServer, includingPlayers: includingPlayers);
+		return IsPassableAt(position, position, isServer, includingPlayers: includingPlayers, excludeLayers: excludeLayers, excludeTiles: excludeTiles);
 	}
 
 	/// <summary>
@@ -104,9 +111,9 @@ public class Matrix : MonoBehaviour
 	/// <param name="includingPlayers">Set this to false to ignore players from check</param>
 	/// <param name="context">Is excluded from passable check</param>
 	/// <returns></returns>
-	public bool IsPassableAt(Vector3Int origin, Vector3Int position, bool isServer, CollisionType collisionType = CollisionType.Player, bool includingPlayers = true, GameObject context = null)
+	public bool IsPassableAt(Vector3Int origin, Vector3Int position, bool isServer, CollisionType collisionType = CollisionType.Player, bool includingPlayers = true, GameObject context = null, List<LayerType> excludeLayers = null, List<TileType> excludeTiles = null)
 	{
-		return MetaTileMap.IsPassableAt(origin, position, isServer, collisionType: collisionType, inclPlayers: includingPlayers, context: context);
+		return MetaTileMap.IsPassableAt(origin, position, isServer, collisionType: collisionType, inclPlayers: includingPlayers, context: context, excludeLayers: excludeLayers, excludeTiles: excludeTiles);
 	}
 
 	public bool IsAtmosPassableAt(Vector3Int position, bool isServer)
@@ -185,6 +192,22 @@ public class Matrix : MonoBehaviour
 		}
 
 		return true;
+	}
+
+	/// <summary>
+	/// Efficient way of iterating through the register tiles at a particular position which
+	/// also is safe against modifications made to the list of tiles while the action is running.
+	/// The limitation compared to Get<> is it can only get RegisterTiles, but the benefit is it avoids
+	/// GetComponent so there's no GC. The OTHER benefit is that normally iterating through these
+	/// would throw an exception if the RegisterTiles at this position were modified, such as
+	/// being destroyed are created. This method uses a locking mechanism to avoid
+	/// such issues.
+	/// </summary>
+	/// <param name="localPosition"></param>
+	/// <returns></returns>
+	public void ForEachRegisterTileSafe(IRegisterTileAction action, Vector3Int localPosition, bool isServer)
+	{
+		(isServer ? ServerObjects : ClientObjects).ForEachSafe(action, localPosition);
 	}
 
 	public IEnumerable<T> Get<T>(Vector3Int localPosition, bool isServer)
@@ -267,19 +290,103 @@ public class Matrix : MonoBehaviour
 		return (true);
 	}
 
-	public IEnumerable<ElectricalOIinheritance> GetElectricalConnections(Vector3Int position)
+	public List<IntrinsicElectronicData> GetElectricalConnections(Vector3Int position)
 	{
+		var list = ElectricalPool.GetFPCList();
 		if (ServerObjects != null)
 		{
-			return ServerObjects.Get(position)
-				.Select(x => x != null ? x.GetComponent<ElectricalOIinheritance>() : null)
-				.Where(x => x != null)
-				.Where(y => y.enabled);
+			var collection = ServerObjects.Get(position);
+			for (int i = collection.Count - 1; i >= 0; i--)
+			{
+				if (i < collection.Count && collection[i] != null
+				    && collection[i].ElectricalData != null &&
+				    collection[i].ElectricalData.InData != null)
+				{
+					list.Add(collection[i].ElectricalData.InData);
+				}
+			}
 		}
-		else
+		if (metaDataLayer.Get(position)?.ElectricalData != null)
 		{
-			return null;
+			foreach (var electricalMetaData in metaDataLayer.Get(position).ElectricalData)
+			{
+				list.Add(electricalMetaData.InData);
+			}
 		}
+		return (list);
+	}
+
+	public void AddElectricalNode(Vector3Int position, WireConnect wireConnect)
+	{
+		var metaData = metaDataLayer.Get(position, true);
+		var newdata = new ElectricalMetaData();
+		newdata.Initialise(wireConnect, metaData, position, this);
+		metaData.ElectricalData.Add(newdata);
+
+		UnderFloorElectricalSetTile(wireConnect.InData.WireEndA, wireConnect.InData.WireEndB,
+			wireConnect.InData.Categorytype, position, newdata);
+	}
+
+	public void AddElectricalNode(Vector3Int position, ElectricalCableTile electricalCableTile, bool AddTile = false)
+	{
+		var checkPos = position;
+		checkPos.z = 0;
+		var metaData = metaDataLayer.Get(checkPos, true);
+		var newdata = new ElectricalMetaData();
+		newdata.Initialise(electricalCableTile, metaData, position, this);
+		metaData.ElectricalData.Add(newdata);
+		if (AddTile)
+		{
+			if (electricalCableTile != null) {
+				if (UnderFloorLayer == null)
+				{
+					underFloorLayer = GetComponentInChildren<UnderFloorLayer>();
+				}
+				if (UnderFloorLayer != null)
+				{
+					UnderFloorLayer.SetTile(position, electricalCableTile, Matrix4x4.identity);
+				}
+			}
+		}
+	}
+
+	public void EditorAddElectricalNode(Vector3Int position, WireConnect wireConnect)
+	{
+		UnderFloorElectricalSetTile(wireConnect.InData.WireEndA, wireConnect.InData.WireEndB,
+			wireConnect.InData.Categorytype, position);
+	}
+
+	private void UnderFloorElectricalSetTile(Connection WireEndA, Connection WireEndB, PowerTypeCategory powerTypeCategory, Vector3Int position, ElectricalMetaData newdata = null )
+	{
+		ElectricalCableTile Tile = ElectricityFunctions.RetrieveElectricalTile( WireEndA,  WireEndB,  powerTypeCategory);
+		if (newdata != null)
+		{
+			newdata.RelatedTile = Tile;
+		}
+		if (Tile != null) {
+			if (UnderFloorLayer == null)
+			{
+				underFloorLayer = GetComponentInChildren<UnderFloorLayer>();
+			}
+			if (UnderFloorLayer != null)
+			{
+				UnderFloorLayer.SetTile(position, Tile, Matrix4x4.identity);
+			}
+		}
+	}
+
+	public MetaDataNode GetMetaDataNode(Vector3Int localPosition, bool createIfNotExists = true)
+	{
+		return (metaDataLayer.Get(localPosition, createIfNotExists));
+	}
+
+	public void RemoveUnderFloorTile(Vector3Int position, LayerTile tile)
+	{
+		if (UnderFloorLayer == null)
+		{
+			underFloorLayer = GetComponentInChildren<UnderFloorLayer>();
+		}
+		UnderFloorLayer.RemoveSpecifiedTile( position, tile);
 	}
 
 	//Visual debug

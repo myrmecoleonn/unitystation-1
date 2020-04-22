@@ -31,8 +31,6 @@ public static class Spawn
 	private static GameObject uniBackpack;
 	private static GameObject uniHeadSet;
 	public static Dictionary<string, PlayerTextureData> RaceData = new Dictionary<string, PlayerTextureData>();
-	public static Dictionary<PlayerCustomisation, Dictionary<string, PlayerCustomisationData>> PlayerCustomisationData =
-		new Dictionary<PlayerCustomisation, Dictionary<string, PlayerCustomisationData>>();
 
 	/// <summary>
 	/// Default scatter radius when spawning multiple things
@@ -430,6 +428,7 @@ public static class Spawn
 		else
 		{
 			tempObject = Object.Instantiate(prefab, pos, destination.Parent.rotation * destination.LocalRotation, destination.Parent);
+			tempObject.name = prefab.name;
 
 			tempObject.GetComponent<CustomNetTransform>()?.ReInitServerState();
 

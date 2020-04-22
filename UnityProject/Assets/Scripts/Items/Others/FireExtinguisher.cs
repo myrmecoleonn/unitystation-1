@@ -18,7 +18,7 @@ public class FireExtinguisher : NetworkBehaviour, IServerSpawn,
 
 	[SerializeField]
 	[Range(1,50)]
-	private int reagentsPerUse = 5;
+	private int reagentsPerUse = 1;
 
 	public SpriteRenderer spriteRenderer;
 	[SyncVar(hook = nameof(SyncSprite))] public int spriteSync;
@@ -82,21 +82,20 @@ public class FireExtinguisher : NetworkBehaviour, IServerSpawn,
 
 		Vector2	startPos = gameObject.AssumedWorldPosServer();
 		Vector2 targetPos = interaction.WorldPositionTarget.To2Int();
-		List<Vector3Int> positionList = MatrixManager.GetTiles(startPos, targetPos, travelDistance);
+		List<Vector3Int> positionList = CheckPassableTiles(startPos, targetPos);
 		StartCoroutine(Fire(positionList));
 
 		var points = GetParallelPoints(startPos, targetPos, true);
-		positionList = MatrixManager.GetTiles(points[0], points[1], travelDistance);
+		positionList = CheckPassableTiles(points[0], points[1]);
 		StartCoroutine(Fire(positionList));
 
 		points = GetParallelPoints(startPos, targetPos, false);
-		positionList = MatrixManager.GetTiles(points[0], points[1], travelDistance);
+		positionList = CheckPassableTiles(points[0], points[1]);
 		StartCoroutine(Fire(positionList));
 
 		Effect.PlayParticleDirectional( this.gameObject, interaction.TargetVector );
 
-		SoundManager.PlayNetworkedAtPos("Extinguish", startPos, 1);
-		reagentContainer.TakeReagents(reagentsPerUse);
+		SoundManager.PlayNetworkedAtPos("Extinguish", startPos, 1, sourceObj: interaction.Performer);
 
 		interaction.Performer.Pushable()?.NewtonianMove((-interaction.TargetVector).NormalizeToInt());
 	}
@@ -138,9 +137,7 @@ public class FireExtinguisher : NetworkBehaviour, IServerSpawn,
 
 	void ExtinguishTile(Vector3Int worldPos)
 	{
-		//it actually uses remaining contents to react with world
-		//instead of the sprayed ones. not sure if this is right
-		MatrixManager.ReagentReact(reagentContainer.Contents, worldPos);
+		reagentContainer.Spill(worldPos, reagentsPerUse);
 	}
 
 	public void SyncSprite(int oldValue, int value)
@@ -151,5 +148,18 @@ public class FireExtinguisher : NetworkBehaviour, IServerSpawn,
 
 		pickupable.RefreshUISlotImage();
 	}
-
+	private List<Vector3Int> CheckPassableTiles(Vector2 startPos, Vector2 targetPos)
+	{
+		List<Vector3Int> passableTiles = new List<Vector3Int>();
+		List<Vector3Int> positionList = MatrixManager.GetTiles(startPos, targetPos, travelDistance);
+		for (int i = 0; i < positionList.Count; i++)
+		{
+			if (!MatrixManager.IsAtmosPassableAt(positionList[i],true))
+			{
+				return passableTiles;
+			}
+			passableTiles.Add(positionList[i]);
+		}
+		return passableTiles;
+	}
 }

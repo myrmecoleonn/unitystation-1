@@ -7,13 +7,14 @@ using UnityEngine;
 using UnityEngine.Events;
 using Utility = UnityEngine.Networking.Utility;
 using Mirror;
+using UnityEngine.Profiling;
 
 /// <summary>
 /// The Required component for all living creatures
 /// Monitors and calculates health
 /// </summary>
 [RequireComponent(typeof(HealthStateMonitor))]
-public abstract class LivingHealthBehaviour : NetworkBehaviour, IHealth, IFireExposable
+public abstract class LivingHealthBehaviour : NetworkBehaviour, IHealth, IFireExposable, IExaminable
 {
 	private static readonly float GIB_THRESHOLD = 200f;
 	//damage incurred per tick per fire stack
@@ -44,7 +45,7 @@ public abstract class LivingHealthBehaviour : NetworkBehaviour, IHealth, IFireEx
 	public float cloningDamage;
 
 	/// <summary>
-	/// Serverside, used for gibbing bodies after certain amount of damage is received afer death
+	/// Serverside, used for gibbing bodies after certain amount of damage is received after death
 	/// </summary>
 	private float afterDeathDamage = 0f;
 
@@ -73,6 +74,8 @@ public abstract class LivingHealthBehaviour : NetworkBehaviour, IHealth, IFireEx
 	protected GameObject LastDamagedBy;
 
 	public event Action<GameObject> applyDamageEvent;
+
+	public event Action OnDeathNotifyEvent;
 
 	public ConsciousState ConsciousState
 	{
@@ -143,13 +146,12 @@ public abstract class LivingHealthBehaviour : NetworkBehaviour, IHealth, IFireEx
 
 	void OnEnable()
 	{
-		UpdateManager.Instance.Add(UpdateMe);
+		UpdateManager.Add(CallbackType.UPDATE, UpdateMe);
 	}
 
 	void OnDisable()
 	{
-		if (UpdateManager.Instance != null)
-			UpdateManager.Instance.Remove(UpdateMe);
+		UpdateManager.Remove(CallbackType.UPDATE, UpdateMe);
 	}
 
 	/// Add any missing systems:
@@ -230,6 +232,11 @@ public abstract class LivingHealthBehaviour : NetworkBehaviour, IHealth, IFireEx
 	public void Extinguish()
 	{
 		SyncFireStacks(fireStacks, 0);
+	}
+
+	public void ChangeFireStacks(float deltaValue)
+	{
+		SyncFireStacks(fireStacks, fireStacks + deltaValue);
 	}
 
 	private void SyncFireStacks(float oldValue, float newValue)
@@ -357,7 +364,6 @@ public abstract class LivingHealthBehaviour : NetworkBehaviour, IHealth, IFireEx
 		{
 			return;
 		}
-		//TODO: determine and apply armor protection
 
 		var prevHealth = OverallHealth;
 
@@ -365,7 +371,7 @@ public abstract class LivingHealthBehaviour : NetworkBehaviour, IHealth, IFireEx
 
 		LastDamageType = damageType;
 		LastDamagedBy = damagedBy;
-		bodyPartBehaviour.ReceiveDamage(damageType, damage);
+		bodyPartBehaviour.ReceiveDamage(damageType, bodyPartBehaviour.armor.GetDamage(damage, attackType));
 		HealthBodyPartMessage.Send(gameObject, gameObject, bodyPartAim, bodyPartBehaviour.BruteDamage, bodyPartBehaviour.BurnDamage);
 
 		if (attackType == AttackType.Fire)
@@ -407,7 +413,9 @@ public abstract class LivingHealthBehaviour : NetworkBehaviour, IHealth, IFireEx
 
 	public void OnExposed(FireExposure exposure)
 	{
+		Profiler.BeginSample("PlayerExpose");
 		ApplyDamage(null, 1, AttackType.Fire, DamageType.Burn);
+		Profiler.EndSample();
 	}
 
 	/// ---------------------------
@@ -544,6 +552,7 @@ public abstract class LivingHealthBehaviour : NetworkBehaviour, IHealth, IFireEx
 		{
 			return;
 		}
+		OnDeathNotifyEvent?.Invoke();
 		afterDeathDamage = 0;
 		ConsciousState = ConsciousState.DEAD;
 		OnDeathActions();
@@ -752,6 +761,61 @@ public abstract class LivingHealthBehaviour : NetworkBehaviour, IHealth, IFireEx
 		}
 		Gizmos.color = Color.blue.WithAlpha( 0.5f );
 		Gizmos.DrawCube( registerTile.WorldPositionServer, Vector3.one );
+	}
+
+	/// <summary>
+	/// This is just a simple initial implementation of IExaminable to health;
+	/// can potentially be extended to return more details and let the server
+	/// figure out what to pass to the client, based on many parameters such as
+	/// role, medical skill (if they get implemented), equipped medical scanners,
+	/// etc. In principle takes care of building the string from start to finish,
+	/// so logic generating examine text can be completely separate from examine
+	/// request or netmessage processing.
+	/// </summary>
+	public string Examine(Vector3 worldPos)
+	{
+		var healthFraction = OverallHealth/maxHealth;
+		var healthString  = "";
+
+		if (!IsDead)
+		{
+			if (healthFraction < 0.2f)
+			{
+				healthString = "heavily wounded.";
+			}
+			else if (healthFraction < 0.6f)
+			{
+				healthString = "wounded.";
+			}
+			else
+			{
+				healthString = "in good shape.";
+			}
+
+			// On fire?
+			if (FireStacks > 0)
+			{
+				healthString = "on fire!";
+			}
+
+			healthString = ConsciousState.ToString().ToLower().Replace("_", " ") + " and " + healthString;
+		}
+		else
+		{
+			healthString = "limp and unresponsive. There are no signs of life...";
+		}
+
+		// Assume animal
+		string pronoun = "It";
+		var cs = GetComponentInParent<PlayerScript>()?.characterSettings;
+		if (cs != null)
+		{
+			pronoun = cs.PersonalPronoun();
+			pronoun = pronoun[0].ToString().ToUpper() + pronoun.Substring(1);
+		}
+
+		healthString = pronoun + " is " + healthString + (respiratorySystem.IsSuffocating && !IsDead ? " " + pronoun + " is having trouble breathing!" : "");
+		return healthString;
 	}
 }
 

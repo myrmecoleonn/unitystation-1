@@ -556,7 +556,7 @@ public partial class PlayerSync
 		if (!playerScript.IsGhost)
 		{
 			playerScript.OnTileReached().Invoke(nextState.WorldPosition.RoundToInt());
-			SoundManager.FootstepAtPosition(nextState.WorldPosition);
+			SoundManager.FootstepAtPosition(nextState.WorldPosition, playerScript.mind.stepType, gameObject);
 		}
 
 		return nextState;

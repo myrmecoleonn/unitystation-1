@@ -2,64 +2,130 @@
 using System.Collections;
 using UnityEngine;
 using Mirror;
+using UnityEngine.Serialization;
 
 /// <summary>
-///     Indicates an edible object.
+/// Indicates an edible object
 /// </summary>
-public class Edible : NetworkBehaviour, IClientInteractable<HandActivate>, IClientInteractable<HandApply>
+[RequireComponent(typeof(RegisterItem))]
+[RequireComponent(typeof(ItemAttributesV2))]
+public class Edible : Consumable, ICheckedInteractable<HandActivate>
 {
-    public GameObject leavings;
-    protected bool isDrink = false;
+	public GameObject leavings;
 
-	//TODO remove after deathmatches
-	[Header("Being used for TDM")] public int healAmount;
+	public string sound = "EatFood";
 
-	public int healHungerAmount;
+	private static readonly StandardProgressActionConfig ProgressConfig
+		= new StandardProgressActionConfig(StandardProgressActionType.Restrain);
+
+	[FormerlySerializedAs("NutrientsHealAmount")]
+	public int NutritionLevel = 10;
+
+	protected ItemAttributesV2 itemAttributes;
+	private Stackable stackable;
+	private RegisterItem item;
+
+	private string Name => itemAttributes.ArticleName;
 
 	private void Awake()
 	{
-		GetComponent<ItemAttributesV2>().AddTrait(CommonTraits.Instance.Food);
-	}
-
-	public virtual void TryEat()
-	{
-		//FIXME: PNA Cmd is being used to heal the player instead of heal hunger for the TDM
-		PlayerManager.LocalPlayerScript.playerNetworkActions.CmdEatFood(gameObject,
-            UIManager.Hands.CurrentSlot.NamedSlot, isDrink);
-	}
-
-	/// <summary>
-	/// Used by NPC's' server side
-	/// </summary>
-	public void NPCTryEat()
-	{
-		SoundManager.PlayNetworkedAtPos("EatFood", transform.position);
-		if (leavings != null)
+		item = GetComponent<RegisterItem>();
+		itemAttributes = GetComponent<ItemAttributesV2>();
+		stackable = GetComponent<Stackable>();
+		if (itemAttributes)
 		{
-			Spawn.ServerPrefab(leavings, transform.position, transform.parent);
+			itemAttributes.AddTrait(CommonTraits.Instance.Food);
 		}
-
-		GetComponent<CustomNetTransform>().DisappearFromWorldServer();
+		else
+		{
+			Logger.LogErrorFormat("{0} prefab is missing ItemAttributes", Category.ItemSpawn, name);
+		}
 	}
 
-	public bool Interact(HandActivate interaction)
+	public bool WillInteract(HandActivate interaction, NetworkSide side)
 	{
-		//eat on activate
-		TryEat();
+		if (!DefaultWillInteract.Default(interaction, side)) return false;
 		return true;
 	}
 
-	public bool Interact(HandApply interaction)
+	/// <summary>
+	/// Eat by activating from inventory
+	/// </summary>
+	public void ServerPerformInteraction(HandActivate interaction)
 	{
-		//eat when we hand apply to ourselves
-		if (interaction.Performer == PlayerManager.LocalPlayer &&
-		    interaction.HandObject == gameObject
-		    && interaction.TargetObject == PlayerManager.LocalPlayer)
+		TryConsume(interaction.PerformerPlayerScript.gameObject);
+	}
+
+	public override void TryConsume(GameObject feederGO, GameObject eaterGO)
+	{
+		var eater = eaterGO.GetComponent<PlayerScript>();
+		if (eater == null)
 		{
-			TryEat();
-			return true;
+			// todo: implement non-player eating
+			SoundManager.PlayNetworkedAtPos(sound, item.WorldPosition);
+			if (leavings != null)
+			{
+				Spawn.ServerPrefab(leavings, item.WorldPosition, transform.parent);
+			}
+
+			Despawn.ServerSingle(gameObject);
+			return;
 		}
 
-		return false;
+		var feeder = feederGO.GetComponent<PlayerScript>();
+
+		// Show eater message
+		var eaterHungerState = eater.playerHealth.Metabolism.HungerState;
+		ConsumableTextUtils.SendGenericConsumeMessage(feeder, eater, eaterHungerState, Name, "eat");
+
+		// Check if eater can eat anything
+		if (eaterHungerState != HungerState.Full)
+		{
+			if (feeder != eater)  //If you're feeding it to someone else.
+			{
+				//Wait 3 seconds before you can feed
+				StandardProgressAction.Create(ProgressConfig, () =>
+				{
+					ConsumableTextUtils.SendGenericForceFeedMessage(feeder, eater, eaterHungerState, Name, "eat");
+					Eat(eater, feeder);
+				}).ServerStartProgress(eater.registerTile, 3f, feeder.gameObject);
+				return;
+			}
+			else
+			{
+				Eat(eater, feeder);
+			}
+		}
+	}
+
+	private void Eat(PlayerScript eater, PlayerScript feeder)
+	{
+		SoundManager.PlayNetworkedAtPos(sound, eater.WorldPos, sourceObj: eater.gameObject);
+
+		eater.playerHealth.Metabolism
+			.AddEffect(new MetabolismEffect(NutritionLevel, 0, MetabolismDuration.Food));
+
+		var feederSlot = feeder.ItemStorage.GetActiveHandSlot();
+		//If food has a stack component, decrease amount by one instead of deleting the entire stack.
+		if (stackable != null)
+		{
+			stackable.ServerConsume(1);
+		}
+		else
+		{
+			Inventory.ServerDespawn(feederSlot);
+		}
+
+		if (leavings != null)
+		{
+			var leavingsInstance = Spawn.ServerPrefab(leavings).GameObject;
+			var pickupable = leavingsInstance.GetComponent<Pickupable>();
+			bool added = Inventory.ServerAdd(pickupable, feederSlot);
+			if (!added)
+			{
+				//If stackable has leavings and they couldn't go in the same slot, they should be dropped
+				pickupable.CustomNetTransform.SetPosition(feeder.WorldPos);
+			}
+		}
 	}
 }

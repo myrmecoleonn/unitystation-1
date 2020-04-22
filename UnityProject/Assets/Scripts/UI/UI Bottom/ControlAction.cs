@@ -24,7 +24,13 @@ public class ControlAction : MonoBehaviour
 	/// </summary>
 	public void Resist()
 	{
-		// TODO implement resist functionality once handcuffs and things are in
+		if(PlayerManager.LocalPlayerScript.IsGhost)
+		{
+			return;
+		}
+		
+		PlayerManager.LocalPlayerScript.playerNetworkActions.CmdResist();
+		
 		SoundManager.Play("Click01");
 		Logger.Log("Resist Button", Category.UI);
 	}
@@ -37,6 +43,12 @@ public class ControlAction : MonoBehaviour
 
 		// if (!Validations.CanInteract(PlayerManager.LocalPlayerScript, NetworkSide.Client, allowCuffed: true)); Commented out because it does... nothing?
 		UI_ItemSlot currentSlot = UIManager.Hands.CurrentSlot;
+
+		if(PlayerManager.LocalPlayerScript.IsGhost) 
+		{
+			return;
+		}
+	
 		if (currentSlot.Item == null)
 		{
 			return;
@@ -96,8 +108,10 @@ public class ControlAction : MonoBehaviour
 		if (pullImage && pullImage.enabled)
 		{
 			PlayerScript ps = PlayerManager.LocalPlayerScript;
-
-			ps.pushPull.CmdStopPulling();
+			if (ps.pushPull != null)
+			{
+				ps.pushPull.CmdStopPulling();
+			}
 		}
 	}
 
